@@ -1,0 +1,46 @@
+import express from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import connectDB from './config/db.js';
+import env from './config/env.js';
+import errorHandler from './middleware/errorHandler.js';
+
+import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js';
+import departmentRoutes from './routes/department.routes.js';
+import customerRoutes from './routes/customer.routes.js';
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
+
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, message: 'CA Portal API running' });
+});
+
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/department', departmentRoutes);
+app.use('/api/customer', customerRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
+});
+
+app.use(errorHandler);
+
+const start = async () => {
+  if (!env.MONGODB_URI) {
+    console.error('MONGODB_URI is not set in .env file');
+    process.exit(1);
+  }
+  await connectDB();
+  app.listen(env.PORT, () => {
+    console.log(`Server running on port ${env.PORT}`);
+  });
+};
+
+start();
