@@ -15,8 +15,13 @@ import customerRoutes from './routes/customer.routes.js';
 const app = express();
 
 app.use(helmet());
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json({ limit: '60mb' }));
