@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Client Portal",
+    "slug": "client-portal",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "client-portal",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cafirm.clientportal"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.cafirm.clientportal"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "272ceb5c-9e68-4592-99c5-7ec5bb3d86fc"
+      }
+    },
+    "owner": "vighneshprasad"
+  }
+}
