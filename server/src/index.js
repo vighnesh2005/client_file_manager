@@ -1,7 +1,6 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import mongoSanitize from 'express-mongo-sanitize';
 import morgan from 'morgan';
 import connectDB from './config/db.js';
 import env from './config/env.js';
@@ -26,12 +25,6 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '60mb' }));
 app.use(express.urlencoded({ extended: false, limit: '60mb' }));
-app.use(mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }) => {
-    console.warn(`NoSQL injection attempt blocked on ${req.path}: key="${key}"`);
-  },
-}));
 app.use(morgan('dev'));
 
 app.get('/api/health', (req, res) => {
