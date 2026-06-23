@@ -30,8 +30,6 @@ import {
   AlertTriangle,
   FolderPlus,
   Upload,
-  PanelRight,
-  PanelRightClose,
 } from 'lucide-react';
 
 export default function AdminDocumentsExplorer() {
@@ -48,7 +46,6 @@ export default function AdminDocumentsExplorer() {
   const [historyIndex, setHistoryIndex] = useState(0); // Current pointer
   
   const [selectedItem, setSelectedItem] = useState(null); // selected folder or file
-  const [panelOpen, setPanelOpen] = useState(true);
   
   // Details pane edit form
   const [editForm, setEditForm] = useState({ title: '', notes: '', status: '' });
@@ -71,6 +68,47 @@ export default function AdminDocumentsExplorer() {
   const [uploadFiles, setUploadFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const panelRef = useRef(null);
+  const isResizing = useRef(false);
+  const [panelWidth, setPanelWidth] = useState(288);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing.current) return;
+      const container = panelRef.current?.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      setPanelWidth(Math.max(200, Math.min(500, rect.right - e.clientX)));
+    };
+    const handleMouseUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   useEffect(() => {
     if (selectedItem) {
@@ -117,7 +155,6 @@ export default function AdminDocumentsExplorer() {
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);
-    setPanelOpen(true);
     if (item.type === 'file') {
       setEditForm({
         title: item.doc.title || item.doc.originalName || '',
@@ -506,6 +543,10 @@ export default function AdminDocumentsExplorer() {
     setSelectedItem(folderItem);
   };
 
+  const panelClassName = 'bg-[#f9fafb] border-l border-[#e5e7eb] h-full p-4 overflow-y-auto flex flex-col gap-4 relative ' + (isMobile
+    ? 'fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm shadow-xl transition-transform duration-300 ' + (selectedItem ? 'translate-x-0' : 'translate-x-full')
+    : 'shrink-0 ' + (selectedItem ? 'opacity-100' : 'lg:opacity-90 lg:block hidden bg-gray-50/30'));
+
   return (
     <div className="flex flex-col -m-6 h-screen bg-[#f3f4f6] select-none overflow-hidden">
         
@@ -623,17 +664,8 @@ export default function AdminDocumentsExplorer() {
             </div>
           )}
 
-          {/* Panel Toggle */}
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            className="p-1.5 rounded hover:bg-gray-200 transition text-gray-500 hover:text-gray-700 shrink-0"
-            title={panelOpen ? 'Close panel' : 'Open panel'}
-          >
-            {panelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
-          </button>
+          {/* Windows Explorer Style Sub-Toolbar for Filters */}
         </div>
-
-        {/* Windows Explorer Style Sub-Toolbar for Filters */}
         <div className="h-10 bg-white border-b border-[#e5e7eb] px-3 flex items-center gap-2 justify-between shrink-0 text-xs text-gray-600">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-400 text-[10px] uppercase tracking-wider mr-1">Filters:</span>
@@ -1007,8 +1039,25 @@ export default function AdminDocumentsExplorer() {
             )}
           </div>
 
+          {/* Mobile backdrop */}
+          {isMobile && selectedItem && (
+            <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setSelectedItem(null)} />
+          )}
+
+          {/* Resize handle (desktop only) */}
+          {!isMobile && (
+            <div
+              className="w-1.5 cursor-col-resize shrink-0 hover:bg-blue-400/30 active:bg-blue-400/50 transition-colors"
+              onMouseDown={handleResizeStart}
+            />
+          )}
+
           {/* Right Details Panel */}
-          <div className={`${panelOpen ? 'w-72' : 'w-0 overflow-hidden'} bg-[#f9fafb] border-l border-[#e5e7eb] h-full p-4 overflow-y-auto shrink-0 flex flex-col gap-4 relative transition-all duration-300`}>
+          <div
+            ref={panelRef}
+            style={isMobile ? undefined : { width: panelWidth }}
+            className={panelClassName}
+          >
             {selectedItem ? (
               <div className="flex flex-col h-full gap-4 overflow-y-auto max-h-[850px] scrollbar-none pr-1">
                 

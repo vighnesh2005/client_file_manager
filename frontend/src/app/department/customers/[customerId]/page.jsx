@@ -33,8 +33,6 @@ import {
   Pencil,
   Trash2,
   FolderPlus,
-  PanelRight,
-  PanelRightClose,
 } from 'lucide-react';
 
 export default function DeptCustomerDocsExplorer() {
@@ -60,13 +58,53 @@ export default function DeptCustomerDocsExplorer() {
   const [historyIndex, setHistoryIndex] = useState(0); // Current pointer
   
   const [selectedItem, setSelectedItem] = useState(null); // Selected file or folder
-  const [panelOpen, setPanelOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCat, setSelectedCat] = useState('');
   const [notes, setNotes] = useState('');
   const [savingNotes, setSavingNotes] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const panelRef = useRef(null);
+  const isResizing = useRef(false);
+  const [panelWidth, setPanelWidth] = useState(288);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (!isResizing.current) return;
+      const container = panelRef.current?.parentElement;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      setPanelWidth(Math.max(200, Math.min(500, rect.right - e.clientX)));
+    };
+    const handleMouseUp = () => {
+      if (!isResizing.current) return;
+      isResizing.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    isResizing.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
   // Sorting state
   const [sortField, setSortField] = useState('name');
@@ -344,7 +382,6 @@ export default function DeptCustomerDocsExplorer() {
         toast.success('Result file deleted successfully');
       }
       setSelectedItem(null);
-      setPanelOpen(false);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete');
@@ -358,7 +395,6 @@ export default function DeptCustomerDocsExplorer() {
     setHistoryIndex(updatedHistory.length - 1);
     setCurrentPath(newPath);
     setSelectedItem(null);
-    setPanelOpen(false);
   };
 
   const handleBack = () => {
@@ -367,7 +403,6 @@ export default function DeptCustomerDocsExplorer() {
       setHistoryIndex(idx);
       setCurrentPath(history[idx]);
       setSelectedItem(null);
-      setPanelOpen(false);
     }
   };
 
@@ -377,7 +412,6 @@ export default function DeptCustomerDocsExplorer() {
       setHistoryIndex(idx);
       setCurrentPath(history[idx]);
       setSelectedItem(null);
-      setPanelOpen(false);
     }
   };
 
@@ -509,7 +543,6 @@ export default function DeptCustomerDocsExplorer() {
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);
-    setPanelOpen(true);
     if (item.type === 'submission' || item.type === 'result') {
       setNotes(item.doc.notes || '');
     } else {
@@ -534,8 +567,11 @@ export default function DeptCustomerDocsExplorer() {
     };
     navigateToPath([{ id: req.id, name: req.name, type: 'request' }]);
     setSelectedItem(folderItem);
-    setPanelOpen(true);
   };
+
+  const panelClassName = 'bg-[#f9fafb] border-l border-[#e5e7eb] h-full p-4 overflow-y-auto flex flex-col gap-4 relative ' + (isMobile
+    ? 'fixed inset-y-0 right-0 z-50 w-[85vw] max-w-sm shadow-xl transition-transform duration-300 ' + (selectedItem ? 'translate-x-0' : 'translate-x-full')
+    : 'shrink-0 ' + (selectedItem ? 'opacity-100' : 'lg:opacity-90 lg:block hidden bg-gray-50/30'));
 
   return (
     <div className="flex flex-col -m-6 h-screen bg-[#f3f4f6] select-none overflow-hidden">
@@ -654,14 +690,6 @@ export default function DeptCustomerDocsExplorer() {
             </div>
           )}
 
-          {/* Panel Toggle */}
-          <button
-            onClick={() => setPanelOpen(!panelOpen)}
-            className="p-1.5 rounded hover:bg-gray-200 transition text-gray-500 hover:text-gray-700 shrink-0"
-            title={panelOpen ? 'Close panel' : 'Open panel'}
-          >
-            {panelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
-          </button>
         </div>
 
         {/* Workspace split into Sidebar, Files List, Details */}
@@ -987,8 +1015,25 @@ export default function DeptCustomerDocsExplorer() {
             )}
           </div>
 
+          {/* Mobile backdrop */}
+          {isMobile && selectedItem && (
+            <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setSelectedItem(null)} />
+          )}
+
+          {/* Resize handle (desktop only) */}
+          {!isMobile && (
+            <div
+              className="w-1.5 cursor-col-resize shrink-0 hover:bg-blue-400/30 active:bg-blue-400/50 transition-colors"
+              onMouseDown={handleResizeStart}
+            />
+          )}
+
           {/* Right Details Panel */}
-          <div className={`${panelOpen ? 'w-72' : 'w-0 overflow-hidden'} bg-[#f9fafb] border-l border-[#e5e7eb] h-full p-4 overflow-y-auto shrink-0 flex flex-col gap-4 relative transition-all duration-300`}>
+          <div
+            ref={panelRef}
+            style={isMobile ? undefined : { width: panelWidth }}
+            className={panelClassName}
+          >
             {selectedItem ? (
               <div className="flex flex-col h-full gap-4 overflow-y-auto max-h-[850px] scrollbar-none pr-1">
                 
@@ -996,7 +1041,7 @@ export default function DeptCustomerDocsExplorer() {
                 <div className="flex items-start justify-between">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">File Properties</span>
                   <button
-                    onClick={() => { setSelectedItem(null); setPanelOpen(false); }}
+                    onClick={() => setSelectedItem(null)}
                     className="p-0.5 text-gray-400 hover:bg-[#e5e7eb] rounded-full"
                   >
                     <X className="w-4 h-4" />
