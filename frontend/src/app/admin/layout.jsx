@@ -74,7 +74,7 @@ export default function AdminLayout({ children }) {
       )}
       <aside
         className={`
-          bg-gray-900 text-white flex flex-col transition-all duration-300 shrink-0 z-40
+          bg-gray-900 text-white flex flex-col transition-all duration-300 shrink-0 z-40 overflow-x-hidden
           ${isMobile
             ? `fixed inset-y-0 left-0 ${sidebarOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full'}`
             : `${sidebarOpen ? 'w-64' : 'w-16'} relative`}
@@ -84,7 +84,9 @@ export default function AdminLayout({ children }) {
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1.5 hover:bg-gray-700 rounded-lg">
             {sidebarOpen ? (isMobile ? <X className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />) : <Menu className="w-5 h-5" />}
           </button>
-          {sidebarOpen && <span className="ml-3 font-semibold text-sm">CA Portal Admin</span>}
+          <span className={`font-semibold text-sm transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
+            CA Portal Admin
+          </span>
         </div>
 
         <nav className="flex-1 py-4 space-y-1 px-2">
@@ -95,24 +97,26 @@ export default function AdminLayout({ children }) {
                 key={item.href}
                 href={item.href}
                 onClick={closeSidebar}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+                className={`flex items-center px-3 py-2.5 rounded-lg text-sm transition ${isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800'} overflow-hidden`}
               >
                 <item.icon className="w-5 h-5 shrink-0" />
-                {sidebarOpen && <span>{item.label}</span>}
+                <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
 
-        {recentItems.length > 0 && sidebarOpen && (
-          <div className="px-4 py-3 border-t border-gray-800">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Recent Items</span>
+        {recentItems.length > 0 && (
+          <div className={`transition-all duration-300 overflow-hidden px-4 ${sidebarOpen ? 'opacity-100 max-h-48 py-3 border-t border-gray-800' : 'opacity-0 max-h-0 py-0 border-transparent pointer-events-none'}`}>
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2 whitespace-nowrap">Recent Items</span>
             <div className="space-y-1.5">
               {recentItems.map((item) => (
                 <Link
                   key={item.id}
                   href={item.path}
-                  className="text-xs text-gray-400 hover:text-white block truncate hover:underline"
+                  className="text-xs text-gray-400 hover:text-white block truncate hover:underline whitespace-nowrap"
                   title={item.name}
                 >
                   {item.name}
@@ -123,24 +127,28 @@ export default function AdminLayout({ children }) {
         )}
 
         <div className="p-4 border-t border-gray-700">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-sm font-bold">
+          <div className="flex items-center mb-3">
+            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-sm font-bold shrink-0">
               {user.name?.[0]}
             </div>
-            {sidebarOpen && (
+            <div className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
               <div className="text-sm truncate">
                 <p className="font-medium">{user.name}</p>
                 <p className="text-xs text-gray-400">Admin</p>
               </div>
-            )}
+            </div>
           </div>
-          <a href="mailto:support@cafirm.com?subject=Report a Problem" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 w-full px-2 py-1.5 rounded hover:bg-gray-800 mt-1">
-            <AlertCircle className="w-4 h-4" />
-            {sidebarOpen && <span>Report a Problem</span>}
+          <a href="mailto:support@cafirm.com?subject=Report a Problem" className="flex items-center text-sm text-gray-500 hover:text-gray-300 w-full px-2 py-1.5 rounded hover:bg-gray-800 mt-1 overflow-hidden">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
+              Report a Problem
+            </span>
           </a>
-          <button onClick={logout} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white w-full px-2 py-1.5 rounded hover:bg-gray-800">
-            <LogOut className="w-4 h-4" />
-            {sidebarOpen && <span>Sign Out</span>}
+          <button onClick={logout} className="flex items-center text-sm text-gray-400 hover:text-white w-full px-2 py-1.5 rounded hover:bg-gray-800 overflow-hidden">
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
+              Sign Out
+            </span>
           </button>
         </div>
       </aside>
