@@ -101,38 +101,98 @@ export const getCustomers = async (req, res) => {
     };
   }
 
-  const customers = await Document.aggregate([
-    { $match: matchStage },
-    { $group: { _id: '$customerId', totalDocs: { $sum: 1 }, pendingDocs: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } }, lastDoc: { $max: '$createdAt' } } },
-    { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'customer' } },
-    { $unwind: '$customer' },
-    { $sort: { lastDoc: -1 } },
-    {
-      $project: {
-        _id: '$customer._id',
-        name: '$customer.name',
-        email: '$customer.email',
-        totalDocs: 1,
-        pendingDocs: 1,
-        lastDoc: 1,
-      },
-    },
-  ]);
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
 
-  res.json({ success: true, data: customers });
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    
+    const countRes = await Document.aggregate([
+      { $match: matchStage },
+      { $group: { _id: '$customerId' } },
+      { $count: 'total' }
+    ]);
+    const total = countRes[0]?.total || 0;
+
+    const customers = await Document.aggregate([
+      { $match: matchStage },
+      { $group: { _id: '$customerId', totalDocs: { $sum: 1 }, pendingDocs: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } }, lastDoc: { $max: '$createdAt' } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'customer' } },
+      { $unwind: '$customer' },
+      { $sort: { lastDoc: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          _id: '$customer._id',
+          name: '$customer.name',
+          email: '$customer.email',
+          totalDocs: 1,
+          pendingDocs: 1,
+          lastDoc: 1,
+        },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      data: customers,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const customers = await Document.aggregate([
+      { $match: matchStage },
+      { $group: { _id: '$customerId', totalDocs: { $sum: 1 }, pendingDocs: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } }, lastDoc: { $max: '$createdAt' } } },
+      { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'customer' } },
+      { $unwind: '$customer' },
+      { $sort: { lastDoc: -1 } },
+      {
+        $project: {
+          _id: '$customer._id',
+          name: '$customer.name',
+          email: '$customer.email',
+          totalDocs: 1,
+          pendingDocs: 1,
+          lastDoc: 1,
+        },
+      },
+    ]);
+
+    res.json({ success: true, data: customers });
+  }
 };
 
 export const getCustomerDocuments = async (req, res) => {
   const deptId = req.user.departmentId;
   const { customerId } = req.params;
 
-  const docs = await Document.find({ customerId, departmentId: deptId, isDeleted: { $ne: true } })
-    .populate('categoryId', 'name')
-    .populate('resultFile.uploadedBy', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
+  const query = { customerId, departmentId: deptId, isDeleted: { $ne: true } };
 
-  res.json({ success: true, data: docs });
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await Document.countDocuments(query);
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({
+      success: true,
+      data: docs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: docs });
+  }
 };
 
 export const getDocuments = async (req, res) => {
@@ -144,14 +204,34 @@ export const getDocuments = async (req, res) => {
   if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
   if (customerId && typeof customerId === 'string') query.customerId = customerId;
 
-  const docs = await Document.find(query)
-    .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
-    .populate('resultFile.uploadedBy', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
 
-  res.json({ success: true, data: docs });
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await Document.countDocuments(query);
+    const docs = await Document.find(query)
+      .populate('customerId', 'name email')
+      .populate('categoryId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({
+      success: true,
+      data: docs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const docs = await Document.find(query)
+      .populate('customerId', 'name email')
+      .populate('categoryId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: docs });
+  }
 };
 
 export const getDocumentDetail = async (req, res) => {
@@ -472,4 +552,119 @@ export const renameCustomer = async (req, res) => {
   if (!updated) throw new AppError('Customer not found', 404);
 
   res.json({ success: true, data: updated });
+};
+
+export const departmentBatchDocuments = async (req, res) => {
+  const { ids, action, status } = req.body;
+  const deptId = req.user.departmentId;
+
+  if (!ids || !Array.isArray(ids)) {
+    throw new AppError('Document IDs array is required', 400);
+  }
+
+  if (action === 'status') {
+    if (!status || !['pending', 'processing', 'completed', 'blocked'].includes(status)) {
+      throw new AppError('Valid status is required', 400);
+    }
+    const updatePayload = { status };
+    if (status === 'blocked') {
+      updatePayload.paymentBlocked = true;
+      updatePayload.blockedAt = new Date();
+      updatePayload.blockedBy = req.user._id;
+    } else {
+      updatePayload.paymentBlocked = false;
+    }
+
+    for (const id of ids) {
+      const doc = await Document.findOne({ _id: id, departmentId: deptId });
+      if (doc) {
+        if (doc.groupId) {
+          if (status !== 'blocked') {
+            await Document.updateMany(
+              { groupId: doc.groupId, departmentId: deptId },
+              { $set: updatePayload, $unset: { blockedAt: 1, blockedBy: 1 } }
+            );
+          } else {
+            await Document.updateMany({ groupId: doc.groupId, departmentId: deptId }, updatePayload);
+          }
+        } else {
+          doc.status = status;
+          if (status === 'blocked') {
+            doc.paymentBlocked = true;
+            doc.blockedAt = new Date();
+            doc.blockedBy = req.user._id;
+          } else {
+            doc.paymentBlocked = false;
+            doc.blockedAt = undefined;
+            doc.blockedBy = undefined;
+          }
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'block') {
+    for (const id of ids) {
+      const doc = await Document.findOne({ _id: id, departmentId: deptId });
+      if (doc) {
+        if (doc.groupId) {
+          await Document.updateMany(
+            { groupId: doc.groupId, departmentId: deptId, resultFile: { $exists: true } },
+            { paymentBlocked: true, status: 'blocked', blockedAt: new Date(), blockedBy: req.user._id }
+          );
+        } else if (doc.resultFile) {
+          doc.paymentBlocked = true;
+          doc.status = 'blocked';
+          doc.blockedAt = new Date();
+          doc.blockedBy = req.user._id;
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'unblock') {
+    for (const id of ids) {
+      const doc = await Document.findOne({ _id: id, departmentId: deptId });
+      if (doc) {
+        if (doc.groupId) {
+          await Document.updateMany(
+            { groupId: doc.groupId, departmentId: deptId, resultFile: { $exists: true } },
+            { paymentBlocked: false, $unset: { blockedAt: 1, blockedBy: 1 } }
+          );
+        } else if (doc.resultFile) {
+          doc.paymentBlocked = false;
+          doc.blockedAt = undefined;
+          doc.blockedBy = undefined;
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'delete') {
+    if (!req.user.canDelete) {
+      throw new AppError('You do not have permission to delete files or folders', 403);
+    }
+    for (const id of ids) {
+      const doc = await Document.findOne({ _id: id, departmentId: deptId });
+      if (doc) {
+        let docsToPurge = [doc];
+        if (doc.groupId) {
+          docsToPurge = await Document.find({ groupId: doc.groupId });
+        }
+        for (const item of docsToPurge) {
+          if (item.storedPath && !item.fileDeletedFromStorage) {
+            try { if (fs.existsSync(item.storedPath)) fs.unlinkSync(item.storedPath); } catch (_) {}
+          }
+          if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
+            try { if (fs.existsSync(item.resultFile.storedPath)) fs.unlinkSync(item.resultFile.storedPath); } catch (_) {}
+          }
+          item.isDeleted = true;
+          item.purgedAt = new Date();
+          item.purgedBy = req.user._id;
+          await item.save();
+        }
+      }
+    }
+  } else {
+    throw new AppError('Invalid action', 400);
+  }
+
+  res.json({ success: true, message: 'Batch operation completed successfully' });
 };

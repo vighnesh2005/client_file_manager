@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { customerAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import { Upload as UploadIcon } from 'lucide-react';
@@ -11,6 +11,8 @@ export default function CustomerUploadPage() {
   const [files, setFiles] = useState([]);
   const [requiresResult, setRequiresResult] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     customerAPI.getDepartments()
@@ -50,6 +52,32 @@ export default function CustomerUploadPage() {
     setFiles(prev => [...prev, ...selectedFiles]);
     if (e.target) e.target.value = '';
   };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const dropped = Array.from(e.dataTransfer.files || []);
+    const valid = dropped.filter(f => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_FILE_SIZE);
+    if (files.length + valid.length > 10) {
+      toast.error('You can upload at most 10 files at once.');
+      return;
+    }
+    if (valid.length > 0) setFiles(prev => [...prev, ...valid]);
+    if (dropped.length > valid.length) {
+      toast.error(`${dropped.length - valid.length} file(s) skipped - invalid type or too large`);
+    }
+  };
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (files.length > 0 || description.trim() !== '') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [files, description]);
 
   const handleUpload = async (e) => {
     e.preventDefault();
@@ -98,10 +126,19 @@ export default function CustomerUploadPage() {
 
   return (
     <div>
+      {isDragOver && (
+        <div className="fixed inset-0 z-50 bg-blue-600/10 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-12 text-center border-2 border-dashed border-blue-400">
+            <UploadIcon className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+            <p className="text-xl font-semibold text-gray-700">Drop files here</p>
+            <p className="text-sm text-gray-500 mt-1">PDF, images, Word, Excel</p>
+          </div>
+        </div>
+      )}
       <h1 className="text-2xl font-bold mb-6">Upload Documents</h1>
 
       <div className="max-w-lg">
-        <form onSubmit={handleUpload} className="bg-white rounded-lg shadow p-6 space-y-4">
+        <form onSubmit={handleUpload} onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }} onDragLeave={(e) => { e.preventDefault(); setIsDragOver(false); }} onDrop={handleDrop} className="bg-white rounded-lg shadow p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Department</label>
             <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm" required>
@@ -161,7 +198,7 @@ export default function CustomerUploadPage() {
               <div className="divide-y divide-gray-200 max-h-48 overflow-y-auto">
                 {files.map((f, idx) => (
                   <div key={idx} className="flex items-center justify-between py-1.5 text-xs text-gray-700">
-                    <span className="truncate max-w-[250px]" title={f.name}>{f.name}</span>
+                    <span className="truncate max-w-[250px]" title={`Name: ${f.name}\nSize: ${(f.size / 1024 / 1024).toFixed(2)} MB\nType: ${f.type}`}>{f.name}</span>
                     <button
                       type="button"
                       onClick={() => setFiles(prev => prev.filter((_, i) => i !== idx))}

@@ -18,6 +18,14 @@ export default function CustomerDocumentsPage() {
     adminAPI.getCustomers({}).then(res => {
       const found = res.data.data.find(c => c._id === id);
       setCustomer(found);
+      if (found) {
+        const item = { id, name: found.name, path: `/admin/customers/${id}`, time: Date.now() };
+        let items = JSON.parse(localStorage.getItem('recent_admin') || '[]');
+        items = items.filter(i => i.id !== id);
+        items.unshift(item);
+        items = items.slice(0, 5);
+        localStorage.setItem('recent_admin', JSON.stringify(items));
+      }
     }).catch(console.error);
 
     adminAPI.getCustomerDocuments(id)

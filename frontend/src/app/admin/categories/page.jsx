@@ -3,7 +3,10 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, FolderTree } from 'lucide-react';
+import Link from 'next/link';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import SkeletonTable from '@/components/ui/SkeletonTable';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -12,6 +15,7 @@ export default function CategoriesPage() {
   const [showModal, setShowModal] = useState(false);
   const [editCat, setEditCat] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', departmentId: '', isActive: true });
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
@@ -55,14 +59,7 @@ export default function CategoriesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this category?')) return;
-    try {
-      await adminAPI.deleteCategory(id);
-      toast.success('Category deleted');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    setConfirmDelete({ open: true, id });
   };
 
   const openEdit = (cat) => {
@@ -88,6 +85,8 @@ export default function CategoriesPage() {
         </button>
       </div>
 
+      <nav className="flex items-center gap-1 text-xs text-gray-500 mb-4"><Link href="/admin/dashboard" className="hover:text-blue-600">Dashboard</Link><span>/</span><span className="text-gray-800 font-medium">Document Categories</span></nav>
+
       <div className="bg-white rounded-lg shadow overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-600">
@@ -101,9 +100,9 @@ export default function CategoriesPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-gray-500"><SkeletonTable rows={5} cols={5} /></td></tr>
             ) : categories.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">No categories yet</td></tr>
+              <tr><td colSpan={5}><div className="flex flex-col items-center py-12 text-gray-400"><FolderTree className="w-12 h-12 mb-3 text-gray-300" /><p className="text-sm font-medium">No categories yet</p><p className="text-xs mt-1">Click "Add Category" to get started</p></div></td></tr>
             ) : categories.map((cat) => (
               <tr key={cat._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{cat.name}</td>
@@ -153,6 +152,8 @@ export default function CategoriesPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal isOpen={confirmDelete.open} onClose={() => setConfirmDelete({ open: false, id: null })} onConfirm={async () => { await adminAPI.deleteCategory(confirmDelete.id); toast.success('Category deleted'); load(); setConfirmDelete({ open: false, id: null }); }} title="Delete Category" message="Delete this category?" confirmText="Delete" variant="danger" />
     </div>
   );
 }

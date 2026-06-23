@@ -2,9 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import ScrollToTop from '@/components/ui/ScrollToTop';
 import Link from 'next/link';
+import TourOverlay from '@/components/ui/TourOverlay';
+import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, Users, ChevronLeft, Menu, LogOut, X,
+  AlertCircle, LayoutDashboard, Users, ChevronLeft, Menu, LogOut, X,
 } from 'lucide-react';
 
 const navItems = [
@@ -18,6 +21,15 @@ export default function DepartmentLayout({ children }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
+  const [recentItems, setRecentItems] = useState([]);
+
+  useEffect(() => {
+    const loadRecent = () => {
+      const items = JSON.parse(localStorage.getItem('recent_dept') || '[]');
+      setRecentItems(items);
+    };
+    loadRecent();
+  }, [pathname]);
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'department')) {
@@ -88,6 +100,24 @@ export default function DepartmentLayout({ children }) {
           })}
         </nav>
 
+        {recentItems.length > 0 && sidebarOpen && (
+          <div className="px-4 py-3 border-t border-gray-800">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block mb-2">Recent Items</span>
+            <div className="space-y-1.5">
+              {recentItems.map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.path}
+                  className="text-xs text-gray-400 hover:text-white block truncate hover:underline"
+                  title={item.name}
+                >
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="p-4 border-t border-gray-700">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-sm font-bold">
@@ -100,6 +130,10 @@ export default function DepartmentLayout({ children }) {
               </div>
             )}
           </div>
+          <a href="mailto:support@cafirm.com?subject=Report a Problem" className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-300 w-full px-2 py-1.5 rounded hover:bg-gray-800 mt-1">
+            <AlertCircle className="w-4 h-4" />
+            {sidebarOpen && <span>Report a Problem</span>}
+          </a>
           <button onClick={logout} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white w-full px-2 py-1.5 rounded hover:bg-gray-800">
             <LogOut className="w-4 h-4" />
             {sidebarOpen && <span>Sign Out</span>}
@@ -117,7 +151,13 @@ export default function DepartmentLayout({ children }) {
         </button>
       )}
       <main className="flex-1 overflow-auto min-w-0">
-        <div className={`${isMobile && !sidebarOpen ? 'pt-14' : ''} p-4 sm:p-6`}>{children}</div>
+        <div className={`${isMobile && !sidebarOpen ? 'pt-14' : ''} p-4 sm:p-6`}>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+            {children}
+          </motion.div>
+        </div>
+        <ScrollToTop />
+        <TourOverlay role="department" />
       </main>
     </div>
   );

@@ -3,8 +3,11 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, UserCog } from 'lucide-react';
 import { formatDate, copyToClipboard } from '@/lib/utils';
+import Link from 'next/link';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import SkeletonTable from '@/components/ui/SkeletonTable';
 
 export default function DepartmentUsersPage() {
   const [users, setUsers] = useState([]);
@@ -16,6 +19,7 @@ export default function DepartmentUsersPage() {
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState(null);
   const [passwordMode, setPasswordMode] = useState('auto');
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
   const load = async () => {
     setLoading(true);
@@ -75,14 +79,7 @@ export default function DepartmentUsersPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this user?')) return;
-    try {
-      await adminAPI.deleteDepartmentUser(id);
-      toast.success('User deleted');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    setConfirmDelete({ open: true, id });
   };
 
   const handleResetPassword = async (id) => {
@@ -129,6 +126,8 @@ export default function DepartmentUsersPage() {
         </button>
       </div>
 
+      <nav className="flex items-center gap-1 text-xs text-gray-500 mb-4"><Link href="/admin/dashboard" className="hover:text-blue-600">Dashboard</Link><span>/</span><span className="text-gray-800 font-medium">Department Users</span></nav>
+
       {newPassword && (
         <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm font-medium text-green-800">Password: <span className="font-mono text-lg">{newPassword}</span></p>
@@ -151,9 +150,9 @@ export default function DepartmentUsersPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-gray-500"><SkeletonTable rows={5} cols={6} /></td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-500">No users yet</td></tr>
+              <tr><td colSpan={6}><div className="flex flex-col items-center py-12 text-gray-400"><UserCog className="w-12 h-12 mb-3 text-gray-300" /><p className="text-sm font-medium">No users yet</p><p className="text-xs mt-1">Click "Add User" to get started</p></div></td></tr>
             ) : users.map((u) => (
               <tr key={u._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{u.name}</td>
@@ -241,6 +240,8 @@ export default function DepartmentUsersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal isOpen={confirmDelete.open} onClose={() => setConfirmDelete({ open: false, id: null })} onConfirm={async () => { await adminAPI.deleteDepartmentUser(confirmDelete.id); toast.success('User deleted'); load(); setConfirmDelete({ open: false, id: null }); }} title="Delete User" message="Delete this user?" confirmText="Delete" variant="danger" />
     </div>
   );
 }

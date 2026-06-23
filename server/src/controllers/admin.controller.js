@@ -72,13 +72,30 @@ export const getCustomers = async (req, res) => {
   const { search, status } = req.query;
   const query = { role: 'customer' };
   if (search && typeof search === 'string') {
-    query.name = { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    query.$or = [
+      { name: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+      { email: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+    ];
   }
   if (status === 'active') query.isActive = true;
   if (status === 'inactive') query.isActive = false;
 
-  const customers = await User.find(query).sort({ createdAt: -1 }).lean();
-  res.json({ success: true, data: customers });
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
+
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await User.countDocuments(query);
+    const customers = await User.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
+    res.json({
+      success: true,
+      data: customers,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const customers = await User.find(query).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, data: customers });
+  }
 };
 
 export const createCustomer = async (req, res) => {
@@ -162,13 +179,33 @@ export const setCustomerPassword = async (req, res) => {
 
 export const getCustomerDocuments = async (req, res) => {
   const { id } = req.params;
-  const docs = await Document.find({ customerId: id, isDeleted: { $ne: true } })
-    .populate('categoryId', 'name')
-    .populate('departmentId', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
+  const query = { customerId: id, isDeleted: { $ne: true } };
 
-  res.json({ success: true, data: docs });
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await Document.countDocuments(query);
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({
+      success: true,
+      data: docs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: docs });
+  }
 };
 
 export const getDepartments = async (req, res) => {
@@ -395,23 +432,54 @@ export const getAllDocuments = async (req, res) => {
   if (status && typeof status === 'string') query.status = status;
   if (customerId && typeof customerId === 'string') query.customerId = customerId;
 
-  const docs = await Document.find(query)
-    .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
-    .populate('departmentId', 'name')
-    .populate('resultFile.uploadedBy', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
-
-  if (search) {
-    const filtered = docs.filter(d =>
-      d.customerId?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      d.title?.toLowerCase().includes(search.toLowerCase())
-    );
-    return res.json({ success: true, data: filtered });
+  if (search && typeof search === 'string') {
+    // If there is search query, find matching customers
+    const matchingCustomers = await User.find({
+      role: 'customer',
+      $or: [
+        { name: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { email: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+      ]
+    }).select('_id').lean();
+    const customerIds = matchingCustomers.map(c => c._id);
+    
+    query.$or = [
+      { customerId: { $in: customerIds } },
+      { title: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+      { originalName: { $regex: search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+    ];
   }
 
-  res.json({ success: true, data: docs });
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
+
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await Document.countDocuments(query);
+    const docs = await Document.find(query)
+      .populate('customerId', 'name email')
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({
+      success: true,
+      data: docs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const docs = await Document.find(query)
+      .populate('customerId', 'name email')
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .populate('resultFile.uploadedBy', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: docs });
+  }
 };
 
 export const adminBlockDocument = async (req, res) => {
@@ -598,4 +666,111 @@ export const adminPurgeDocumentFiles = async (req, res) => {
     message: `Successfully purged files across the request group (Deleted ${totalFilesDeleted} files).`,
     data: updatedDoc
   });
+};
+
+export const adminBatchDocuments = async (req, res) => {
+  const { ids, action, status } = req.body;
+  if (!ids || !Array.isArray(ids)) {
+    throw new AppError('Document IDs array is required', 400);
+  }
+
+  if (action === 'status') {
+    if (!status || !['pending', 'processing', 'completed', 'blocked'].includes(status)) {
+      throw new AppError('Valid status is required', 400);
+    }
+    const updatePayload = { status };
+    if (status === 'blocked') {
+      updatePayload.paymentBlocked = true;
+      updatePayload.blockedAt = new Date();
+      updatePayload.blockedBy = req.user._id;
+    } else {
+      updatePayload.paymentBlocked = false;
+    }
+
+    for (const id of ids) {
+      const doc = await Document.findById(id);
+      if (doc) {
+        if (doc.groupId) {
+          if (status !== 'blocked') {
+            await Document.updateMany(
+              { groupId: doc.groupId },
+              { $set: updatePayload, $unset: { blockedAt: 1, blockedBy: 1 } }
+            );
+          } else {
+            await Document.updateMany({ groupId: doc.groupId }, updatePayload);
+          }
+        } else {
+          doc.status = status;
+          if (status === 'blocked') {
+            doc.paymentBlocked = true;
+            doc.blockedAt = new Date();
+            doc.blockedBy = req.user._id;
+          } else {
+            doc.paymentBlocked = false;
+            doc.blockedAt = undefined;
+            doc.blockedBy = undefined;
+          }
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'block') {
+    for (const id of ids) {
+      const doc = await Document.findById(id);
+      if (doc) {
+        if (doc.groupId) {
+          await Document.updateMany(
+            { groupId: doc.groupId, resultFile: { $exists: true } },
+            { paymentBlocked: true, status: 'blocked', blockedAt: new Date(), blockedBy: req.user._id }
+          );
+        } else if (doc.resultFile) {
+          doc.paymentBlocked = true;
+          doc.status = 'blocked';
+          doc.blockedAt = new Date();
+          doc.blockedBy = req.user._id;
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'unblock') {
+    for (const id of ids) {
+      const doc = await Document.findById(id);
+      if (doc) {
+        if (doc.groupId) {
+          await Document.updateMany(
+            { groupId: doc.groupId, resultFile: { $exists: true } },
+            { paymentBlocked: false, $unset: { blockedAt: 1, blockedBy: 1 } }
+          );
+        } else if (doc.resultFile) {
+          doc.paymentBlocked = false;
+          doc.blockedAt = undefined;
+          doc.blockedBy = undefined;
+          await doc.save();
+        }
+      }
+    }
+  } else if (action === 'delete') {
+    for (const id of ids) {
+      const doc = await Document.findById(id);
+      if (doc) {
+        let docsToPurge = [doc];
+        if (doc.groupId) {
+          docsToPurge = await Document.find({ groupId: doc.groupId });
+        }
+        for (const item of docsToPurge) {
+          if (item.storedPath && !item.fileDeletedFromStorage) {
+            try { if (fs.existsSync(item.storedPath)) fs.unlinkSync(item.storedPath); } catch (_) {}
+          }
+          if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
+            try { if (fs.existsSync(item.resultFile.storedPath)) fs.unlinkSync(item.resultFile.storedPath); } catch (_) {}
+          }
+          await Document.findByIdAndDelete(item._id);
+        }
+      }
+    }
+  } else {
+    throw new AppError('Invalid action', 400);
+  }
+
+  res.json({ success: true, message: 'Batch operation completed successfully' });
 };

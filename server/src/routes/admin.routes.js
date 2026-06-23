@@ -6,7 +6,7 @@ import {
   getDepartmentUsers, getDepartmentUsersByDept, createDepartmentUser, updateDepartmentUser, deleteDepartmentUser, resetDeptUserPassword, setDeptUserPassword,
   getCategories, getCategoriesByDepartment, createCategory, updateCategory, deleteCategory,
   getAllDocuments, adminBlockDocument, adminUnblockDocument, adminUpdateDocument, adminDeleteDocument,
-  adminPurgeDocumentFiles,
+  adminPurgeDocumentFiles, adminBatchDocuments,
 } from '../controllers/admin.controller.js';
 import {
   renameDocument,
@@ -59,6 +59,7 @@ router.patch('/documents/:id/block', adminBlockDocument);
 router.patch('/documents/:id/unblock', adminUnblockDocument);
 router.put('/documents/:id', adminUpdateDocument);
 router.delete('/documents/:id', adminDeleteDocument);
+router.post('/documents/batch', adminBatchDocuments);
 router.post('/documents/:id/purge', adminPurgeDocumentFiles);
 router.patch('/documents/:id/rename', renameDocument);
 router.patch('/documents/group/:groupId/rename', renameGroup);

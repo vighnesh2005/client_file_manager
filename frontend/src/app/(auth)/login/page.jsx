@@ -6,11 +6,12 @@ import { toast } from 'sonner';
 import { LogIn } from 'lucide-react';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const { login, rememberEmail } = useAuth();
+  const [email, setEmail] = useState(rememberEmail);
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(!!rememberEmail);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { login } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e) => {
@@ -18,7 +19,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      const { user, mustChangePassword } = await login(email, password);
+      const { user, mustChangePassword } = await login(email, password, remember);
       toast.success('Login successful');
       if (mustChangePassword) {
         router.push('/change-password');
@@ -79,6 +80,16 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 required
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer select-none">Remember me</label>
             </div>
             <button
               type="submit"

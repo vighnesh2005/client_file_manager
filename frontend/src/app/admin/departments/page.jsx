@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { adminAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Building2 } from 'lucide-react';
+import Link from 'next/link';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState([]);
@@ -12,6 +14,7 @@ export default function DepartmentsPage() {
   const [editDept, setEditDept] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', isActive: true, permissions: { blockDocuments: true, viewCustomers: true } });
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
 
   const load = () => {
     setLoading(true);
@@ -45,14 +48,7 @@ export default function DepartmentsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this department? Related users and categories will be deactivated.')) return;
-    try {
-      await adminAPI.deleteDepartment(id);
-      toast.success('Department deleted');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    setConfirmDelete({ open: true, id });
   };
 
   const togglePermission = async (id, field, value) => {
@@ -86,11 +82,13 @@ export default function DepartmentsPage() {
         </button>
       </div>
 
+      <nav className="flex items-center gap-1 text-xs text-gray-500 mb-4"><Link href="/admin/dashboard" className="hover:text-blue-600">Dashboard</Link><span>/</span><span className="text-gray-800 font-medium">Departments</span></nav>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="animate-pulse space-y-4">{[1,2,3].map(i => <div key={i} className="h-32 bg-gray-200 rounded-lg" />)}</div>
         ) : departments.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No departments yet</p>
+          <div className="flex flex-col items-center py-12 text-gray-400"><Building2 className="w-12 h-12 mb-3 text-gray-300" /><p className="text-sm font-medium">No departments yet</p><p className="text-xs mt-1">Click "Add Department" to get started</p></div>
         ) : departments.map((dept) => (
           <div key={dept._id} className="bg-white rounded-lg shadow p-5">
             <div className="flex items-start justify-between mb-3">
@@ -142,6 +140,8 @@ export default function DepartmentsPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal isOpen={confirmDelete.open} onClose={() => setConfirmDelete({ open: false, id: null })} onConfirm={async () => { await adminAPI.deleteDepartment(confirmDelete.id); toast.success('Department deleted'); load(); setConfirmDelete({ open: false, id: null }); }} title="Delete Department" message="Delete this department? Related users and categories will be deactivated." confirmText="Delete" variant="danger" />
     </div>
   );
 }

@@ -7,13 +7,17 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [rememberEmail, setRememberEmail] = useState(() => typeof window !== 'undefined' ? (localStorage.getItem('rememberEmail') || '') : '');
 
   const fetchUser = useCallback(async () => {
     try {
-      const token = localStorage.getItem('accessToken');
+      let token = localStorage.getItem('accessToken');
       if (!token) {
-        setLoading(false);
-        return;
+        token = sessionStorage.getItem('accessToken');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
       }
       const res = await authAPI.getMe();
       setUser(res.data.data);
@@ -31,11 +35,20 @@ export function AuthProvider({ children }) {
     });
   }, [fetchUser]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, remember = false) => {
     const res = await authAPI.login({ email, password });
     const { accessToken, refreshToken, user: userData, mustChangePassword } = res.data.data;
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    if (remember) {
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      localStorage.setItem('rememberEmail', email);
+      setRememberEmail(email);
+    } else {
+      sessionStorage.setItem('accessToken', accessToken);
+      sessionStorage.setItem('refreshToken', refreshToken);
+      localStorage.removeItem('rememberEmail');
+      setRememberEmail('');
+    }
     setUser(userData);
     return { user: userData, mustChangePassword };
   };
@@ -43,14 +56,18 @@ export function AuthProvider({ children }) {
   const logout = () => {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('rememberEmail');
+    sessionStorage.removeItem('accessToken');
+    sessionStorage.removeItem('refreshToken');
     setUser(null);
+    setRememberEmail('');
     window.location.href = '/login';
   };
 
   const refetchUser = fetchUser;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refetchUser }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refetchUser, rememberEmail }}>
       {children}
     </AuthContext.Provider>
   );

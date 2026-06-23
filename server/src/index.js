@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import departmentRoutes from './routes/department.routes.js';
 import customerRoutes from './routes/customer.routes.js';
+import searchRoutes from './routes/search.routes.js';
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/department', departmentRoutes);
 app.use('/api/customer', customerRoutes);
+app.use('/api/search', searchRoutes);
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Route not found' });

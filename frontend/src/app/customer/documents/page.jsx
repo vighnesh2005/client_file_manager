@@ -6,7 +6,9 @@ import SlaBadge from '@/components/ui/SlaBadge';
 import Modal from '@/components/ui/Modal';
 import { formatDateTime, formatFileSize, getSlaStatus } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import Pagination from '@/components/ui/Pagination';
 import {
   Download,
   Lock,
@@ -26,9 +28,12 @@ import {
   Monitor,
   HardDrive,
 } from 'lucide-react';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 export default function CustomerDocumentsExplorer() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,11 +46,18 @@ export default function CustomerDocumentsExplorer() {
   const [historyIndex, setHistoryIndex] = useState(0); // Current pointer
   
   const [selectedItem, setSelectedItem] = useState(null); // selected folder or file
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
 
   // Sorting state
   const [sortField, setSortField] = useState('name');
   const [sortOrder, setSortOrder] = useState('asc');
+
+  const [page, setPage] = useState(() => parseInt(searchParams.get('page')) || 1);
+  const [limit, setLimit] = useState(() => parseInt(searchParams.get('limit')) || 10);
+  const [pages, setPages] = useState(1);
+  const [totalDocs, setTotalDocs] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const panelRef = useRef(null);
   const isResizing = useRef(false);
@@ -82,6 +94,16 @@ export default function CustomerDocumentsExplorer() {
     };
   }, []);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp') { e.preventDefault(); handleUp(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') { e.preventDefault(); handleBack(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') { e.preventDefault(); handleForward(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUp, handleBack, handleForward]);
+
   const handleResizeStart = (e) => {
     e.preventDefault();
     isResizing.current = true;
@@ -91,15 +113,94 @@ export default function CustomerDocumentsExplorer() {
 
   const loadData = useCallback(() => {
     setLoading(true);
-    customerAPI.getDocuments()
-      .then(res => setDocuments(res.data.data))
+    customerAPI.getDocuments({
+      page,
+      limit,
+      search: searchQuery,
+    })
+      .then(res => {
+        setDocuments(res.data.data);
+        if (res.data.pagination) {
+          setPages(res.data.pagination.pages);
+          setTotalDocs(res.data.pagination.total);
+        } else {
+          setPages(1);
+          setTotalDocs(res.data.data.length);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [page, limit, searchQuery]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery) params.set('search', searchQuery);
+    if (page > 1) params.set('page', page.toString());
+    if (limit !== 10) params.set('limit', limit.toString());
+    
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [searchQuery, page, limit, pathname, router]);
+
+  useEffect(() => {
+    if (selectedItem && (selectedItem.type === 'submission' || selectedItem.type === 'result')) {
+      const isDeleted = selectedItem.type === 'result'
+        ? selectedItem.doc?.resultFileDeletedFromStorage
+        : selectedItem.doc?.fileDeletedFromStorage;
+      
+      const isBlocked = selectedItem.type === 'result' && selectedItem.doc?.paymentBlocked;
+      
+      if (isDeleted || isBlocked) {
+        setPreviewUrl(null);
+        return;
+      }
+
+      setLoadingPreview(true);
+      setPreviewUrl(null);
+
+      customerAPI.downloadDocument(selectedItem.doc?._id || selectedItem.id, selectedItem.type)
+        .then(res => {
+          const blob = new Blob([res.data], { type: selectedItem.mimeType || res.headers['content-type'] });
+          const url = window.URL.createObjectURL(blob);
+          setPreviewUrl(url);
+        })
+        .catch(err => {
+          console.error('Failed to load preview:', err);
+          setPreviewUrl(null);
+        })
+        .finally(() => {
+          setLoadingPreview(false);
+        });
+    } else {
+      setPreviewUrl(null);
+    }
+
+    return () => {
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [selectedItem]);
+
+  useEffect(() => {
+    if (selectedItem && (selectedItem.type === 'submission' || selectedItem.type === 'result')) {
+      const item = {
+        id: selectedItem.id,
+        name: selectedItem.name,
+        path: `/customer/documents?search=${searchQuery}&selectFile=${selectedItem.id}`,
+        time: Date.now()
+      };
+      let items = JSON.parse(localStorage.getItem('recent_customer') || '[]');
+      items = items.filter(i => i.id !== selectedItem.id);
+      items.unshift(item);
+      items = items.slice(0, 5);
+      localStorage.setItem('recent_customer', JSON.stringify(items));
+    }
+  }, [selectedItem, searchQuery]);
 
   const handleDownload = async (doc, type) => {
     if (type === 'result' && doc.paymentBlocked) {
@@ -121,38 +222,38 @@ export default function CustomerDocumentsExplorer() {
     }
   };
 
-  const navigateToPath = (newPath) => {
+  const navigateToPath = useCallback((newPath) => {
     const updatedHistory = history.slice(0, historyIndex + 1);
     updatedHistory.push(newPath);
     setHistory(updatedHistory);
     setHistoryIndex(updatedHistory.length - 1);
     setCurrentPath(newPath);
     setSelectedItem(null);
-  };
+  }, [history, historyIndex]);
 
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     if (historyIndex > 0) {
       const idx = historyIndex - 1;
       setHistoryIndex(idx);
       setCurrentPath(history[idx]);
       setSelectedItem(null);
     }
-  };
+  }, [historyIndex, history]);
 
-  const handleForward = () => {
+  const handleForward = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const idx = historyIndex + 1;
       setHistoryIndex(idx);
       setCurrentPath(history[idx]);
       setSelectedItem(null);
     }
-  };
+  }, [historyIndex, history]);
 
-  const handleUp = () => {
+  const handleUp = useCallback(() => {
     if (currentPath.length > 0) {
       navigateToPath(currentPath.slice(0, -1));
     }
-  };
+  }, [currentPath, navigateToPath]);
 
   const handleHeaderClick = (field) => {
     if (sortField === field) {
@@ -493,6 +594,7 @@ export default function CustomerDocumentsExplorer() {
                     }).map((d) => (
                       <tr
                         key={d._id}
+                        title={`Name: ${d.title || d.originalName}\nType: Submission File\nStatus: ${d.status}\nSize: ${formatFileSize(d.fileSize)}\nDate: ${formatDateTime(d.createdAt)}`}
                         onClick={() => setSelectedItem({ id: d._id, name: d.title || d.originalName, type: 'submission', doc: d })}
                         className={`cursor-pointer ${selectedItem?.id === d._id ? 'bg-blue-50 font-medium' : 'hover:bg-gray-50/50'}`}
                       >
@@ -515,9 +617,10 @@ export default function CustomerDocumentsExplorer() {
             /* Explorer content folder navigator */
             <div className="flex-1">
               {explorerItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center text-center py-20 text-gray-400 gap-2">
-                  <Folder className="w-12 h-12 text-amber-300 fill-amber-100/50" />
-                  <span className="text-xs font-semibold">Folder is empty</span>
+                <div className="flex flex-col items-center justify-center text-center py-20 text-gray-400 gap-3">
+                  <Folder className="w-16 h-16 text-amber-300 fill-amber-100/50" />
+                  <div><p className="text-sm font-medium text-gray-500">This folder is empty</p><p className="text-xs text-gray-400 mt-0.5">Upload documents to get started</p></div>
+                  <Link href="/customer/upload" className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition">Upload Documents</Link>
                 </div>
               ) : viewMode === 'grid' ? (
                 /* Grid view folder icon layout */
@@ -546,6 +649,7 @@ export default function CustomerDocumentsExplorer() {
                     return (
                       <div
                         key={item.id}
+                        title={`Name: ${item.name}\nType: ${item.type === 'dept' ? 'Department Folder' : item.type === 'request' ? 'Request Batch' : item.type === 'submission' ? 'Submission File' : 'Result Document'}${item.status ? `\nStatus: ${item.status}` : ''}${item.fileSize ? `\nSize: ${formatFileSize(item.fileSize)}` : ''}${item.createdAt ? `\nDate: ${formatDateTime(item.createdAt)}` : ''}${item.itemCount ? `\nItems: ${item.itemCount}` : ''}`}
                             onClick={() => setSelectedItem(item)}
                         onDoubleClick={() => handleItemDoubleClick(item)}
                         className={`flex flex-col items-center text-center p-3 border rounded-lg cursor-pointer transition select-none ${
@@ -619,6 +723,7 @@ export default function CustomerDocumentsExplorer() {
                         return (
                           <tr
                             key={item.id}
+                            title={`Name: ${item.name}\nType: ${item.type === 'dept' ? 'Department Folder' : item.type === 'request' ? 'Request Batch' : item.type === 'submission' ? 'Submission File' : 'Result Document'}${item.status ? `\nStatus: ${item.status}` : ''}${item.fileSize ? `\nSize: ${formatFileSize(item.fileSize)}` : ''}${item.createdAt ? `\nDate: ${formatDateTime(item.createdAt)}` : ''}${item.itemCount ? `\nItems: ${item.itemCount}` : ''}`}
                         onClick={() => setSelectedItem(item)}
                             onDoubleClick={() => handleItemDoubleClick(item)}
                             className={`cursor-pointer ${
@@ -650,6 +755,26 @@ export default function CustomerDocumentsExplorer() {
                   </table>
                 </div>
               )}
+              {/* Pagination Controls */}
+              <div className="mt-4 flex items-center justify-between border-t pt-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Rows per page:</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => {
+                      setLimit(parseInt(e.target.value));
+                      setPage(1);
+                    }}
+                    className="text-xs border rounded px-2 py-1 outline-none bg-white font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+                <Pagination page={page} pages={pages} onPageChange={setPage} />
+              </div>
             </div>
           )}
         </div>
@@ -686,14 +811,37 @@ export default function CustomerDocumentsExplorer() {
                 </button>
               </div>
 
-              {/* Large Preview Graphic */}
-              <div className="p-8 bg-white border border-[#e5e7eb] rounded-lg flex items-center justify-center shadow-xs">
-                {selectedItem.type === 'dept' || selectedItem.type === 'request' ? (
-                  <Folder className={`w-12 h-12 text-amber-600 fill-amber-200/80`} />
+              {/* Large Preview Graphic / Inline Preview */}
+              <div className="p-1 bg-white border border-[#e5e7eb] rounded-lg flex items-center justify-center shadow-xs overflow-hidden h-48 w-full relative">
+                {loadingPreview ? (
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+                    <span className="text-[10px] text-gray-400">Loading preview...</span>
+                  </div>
+                ) : selectedItem.type === 'dept' || selectedItem.type === 'request' ? (
+                  <Folder className="w-12 h-12 text-amber-600 fill-amber-200/80" />
+                ) : previewUrl ? (
+                  selectedItem.mimeType?.startsWith('image/') ? (
+                    <img src={previewUrl} alt={selectedItem.name} className="max-h-full max-w-full object-contain" />
+                  ) : selectedItem.mimeType === 'application/pdf' ? (
+                    <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-4">
+                      <FileText className="w-12 h-12 text-blue-600 fill-white mb-2" />
+                      <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[150px]">{selectedItem.name}</span>
+                      <span className="text-[9px] text-gray-400 mt-0.5">No preview available</span>
+                    </div>
+                  )
                 ) : selectedItem.type === 'result' ? (
-                  <CheckCircle className="w-12 h-12 text-green-500" />
+                  <div className="flex flex-col items-center">
+                    <CheckCircle className="w-12 h-12 text-green-500" />
+                    <span className="text-[9px] text-gray-400 mt-1">Result uploaded</span>
+                  </div>
                 ) : (
-                  <FileText className="w-12 h-12 text-blue-600 fill-white" />
+                  <div className="flex flex-col items-center">
+                    <FileText className="w-12 h-12 text-blue-600 fill-white" />
+                    <span className="text-[9px] text-gray-400 mt-1">No preview</span>
+                  </div>
                 )}
               </div>
 

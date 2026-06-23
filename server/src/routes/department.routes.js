@@ -14,6 +14,7 @@ import {
   downloadFile,
   departmentPurgeDocumentFiles,
   renameCustomer,
+  departmentBatchDocuments,
 } from '../controllers/department.controller.js';
 import {
   renameDocument,
@@ -47,6 +48,7 @@ router.get('/documents/:id/download', downloadFile);
 router.post('/documents/:id/purge', departmentPurgeDocumentFiles);
 router.patch('/documents/:id/rename', renameDocument);
 router.patch('/documents/group/:groupId/rename', renameGroup);
+router.post('/documents/batch', departmentBatchDocuments);
 router.delete('/documents/:id', deleteDocument);
 router.delete('/documents/group/:groupId', deleteGroup);
 router.post('/documents/folder', createEmptyFolder);

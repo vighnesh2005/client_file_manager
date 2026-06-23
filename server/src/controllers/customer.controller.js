@@ -174,13 +174,32 @@ export const getDocuments = async (req, res) => {
   const query = { customerId, isDeleted: { $ne: true } };
   if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
 
-  const docs = await Document.find(query)
-    .populate('categoryId', 'name')
-    .populate('departmentId', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
+  const page = parseInt(req.query.page);
+  const limit = parseInt(req.query.limit);
 
-  res.json({ success: true, data: docs });
+  if (page && limit) {
+    const skip = (page - 1) * limit;
+    const total = await Document.countDocuments(query);
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    res.json({
+      success: true,
+      data: docs,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) }
+    });
+  } else {
+    const docs = await Document.find(query)
+      .populate('categoryId', 'name')
+      .populate('departmentId', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: docs });
+  }
 };
 
 export const downloadDocument = async (req, res) => {

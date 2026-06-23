@@ -56,7 +56,7 @@ export default function CustomerDashboard() {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Documents</h2>
         {documents.length === 0 ? (
-          <p className="text-gray-500 text-center py-8">No documents yet. Upload your first document.</p>
+          <div className="flex flex-col items-center py-12 text-gray-400 gap-3"><FileText className="w-12 h-12 text-gray-300" /><p className="text-sm font-medium">No documents yet</p><Link href="/customer/upload" className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition mt-1">Upload Your First Document</Link></div>
         ) : (
           <div className="space-y-2">
             {documents.slice(0, 5).map((doc) => (

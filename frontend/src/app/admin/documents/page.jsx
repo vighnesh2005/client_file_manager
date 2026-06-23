@@ -1,10 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { adminAPI } from '@/lib/api';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import Pagination from '@/components/ui/Pagination';
 import { toast } from 'sonner';
 import StatusBadge from '@/components/ui/StatusBadge';
 import SlaBadge from '@/components/ui/SlaBadge';
 import { formatDateTime, formatFileSize, getSlaStatus } from '@/lib/utils';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import {
   Search,
   Ban,
@@ -33,12 +36,26 @@ import {
 } from 'lucide-react';
 
 export default function AdminDocumentsExplorer() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [docs, setDocs] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({ status: '', departmentId: '' });
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState(() => {
+    return {
+      status: searchParams.get('status') || '',
+      departmentId: searchParams.get('departmentId') || '',
+    };
+  });
+  const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+
+  const [page, setPage] = useState(() => parseInt(searchParams.get('page')) || 1);
+  const [limit, setLimit] = useState(() => parseInt(searchParams.get('limit')) || 10);
+  const [pages, setPages] = useState(1);
+  const [totalDocs, setTotalDocs] = useState(0);
   
   // Navigation stack state
   const [currentPath, setCurrentPath] = useState([]); // [{ id, name, type }]
@@ -72,6 +89,8 @@ export default function AdminDocumentsExplorer() {
   const isResizing = useRef(false);
   const [panelWidth, setPanelWidth] = useState(288);
   const [isMobile, setIsMobile] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger' });
+  const [isDragOver, setIsDragOver] = useState(false);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
@@ -117,15 +136,73 @@ export default function AdminDocumentsExplorer() {
     }
   }, [selectedItem]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Delete' && selectedItem) {
+        if (selectedItem.type === 'file' || selectedItem.type === 'result_file') {
+          setConfirmState({ open: true, title: 'Delete', message: 'Delete this document?', onConfirm: async () => { await adminAPI.deleteDocument(selectedItem.id); toast.success('Deleted'); setSelectedItem(null); load(); setConfirmState(s => ({...s, open: false})); }, variant: 'danger' });
+        }
+      }
+      if (e.key === 'F2' && selectedItem) {
+        setIsRenaming(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault();
+        setShowCreateFolder(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault();
+        setShowUploadFiles(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedItem]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (editForm.title || editForm.notes) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [editForm]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.departmentId) params.set('departmentId', filters.departmentId);
+    if (page > 1) params.set('page', page.toString());
+    if (limit !== 10) params.set('limit', limit.toString());
+    
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [search, filters.status, filters.departmentId, page, limit, pathname, router]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [docRes, deptRes] = await Promise.all([
-        adminAPI.getAllDocuments(filters),
+        adminAPI.getAllDocuments({
+          ...filters,
+          search,
+          page,
+          limit,
+        }),
         adminAPI.getDepartments()
       ]);
       setDocs(docRes.data.data);
       setDepartments(deptRes.data.data);
+      if (docRes.data.pagination) {
+        setPages(docRes.data.pagination.pages);
+        setTotalDocs(docRes.data.pagination.total);
+      } else {
+        setPages(1);
+        setTotalDocs(docRes.data.data.length);
+      }
       
       // If we have a selected file, refresh its state
       if (selectedItem && selectedItem.type === 'file') {
@@ -144,14 +221,14 @@ export default function AdminDocumentsExplorer() {
     } finally {
       setLoading(false);
     }
-  }, [filters, selectedItem]);
+  }, [filters, search, page, limit, selectedItem]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
       load();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
+  }, [filters, search, page, limit]);
 
   const handleSelectItem = (item) => {
     setSelectedItem(item);
@@ -198,28 +275,11 @@ export default function AdminDocumentsExplorer() {
   };
 
   const handleDelete = async (docId) => {
-    if (!confirm('Delete this document?')) return;
-    try {
-      await adminAPI.deleteDocument(docId);
-      toast.success('Document deleted');
-      setSelectedItem(null);
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    setConfirmState({ open: true, title: 'Delete Document', message: 'Delete this document?', onConfirm: async () => { await adminAPI.deleteDocument(docId); toast.success('Document deleted'); setSelectedItem(null); load(); setConfirmState(s => ({...s, open: false})); }, variant: 'danger' });
   };
 
   const handlePurgeFiles = async (docId) => {
-    if (!confirm('Are you sure you want to purge all physical files for this request/group from storage? The database metadata logs will still be preserved.')) {
-      return;
-    }
-    try {
-      await adminAPI.purgeDocumentFiles(docId);
-      toast.success('Files successfully purged from storage');
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Purge failed');
-    }
+    setConfirmState({ open: true, title: 'Purge Files', message: 'Are you sure you want to purge all physical files for this request/group from storage? The database metadata logs will still be preserved.', onConfirm: async () => { await adminAPI.purgeDocumentFiles(docId); toast.success('Files successfully purged from storage'); load(); setConfirmState(s => ({...s, open: false})); }, variant: 'warning', confirmText: 'Purge Files' });
   };
 
   const handleHeaderClick = (field) => {
@@ -281,24 +341,26 @@ export default function AdminDocumentsExplorer() {
       ? 'Are you sure you want to soft delete this folder and all files inside? The files will be purged from storage, but database records will be kept.'
       : 'Are you sure you want to soft delete this file? The file content will be purged from storage, but the database record will be kept.';
       
-    if (!confirm(message)) return;
-    
-    try {
-      if (isFolder) {
-        await adminAPI.softDeleteGroup(selectedItem.id);
-        toast.success('Folder soft deleted');
-      } else if (selectedItem.type === 'file') {
-        await adminAPI.softDeleteDocument(selectedItem.id, { isResult: false });
-        toast.success('File soft deleted');
-      } else if (selectedItem.type === 'result_file') {
-        await adminAPI.softDeleteDocument(selectedItem.id.replace('_result', ''), { isResult: true });
-        toast.success('Result file soft deleted');
+    setConfirmState({ open: true, title: 'Soft Delete', message, onConfirm: async () => {
+      try {
+        if (isFolder) {
+          await adminAPI.softDeleteGroup(selectedItem.id);
+          toast.success('Folder soft deleted');
+        } else if (selectedItem.type === 'file') {
+          await adminAPI.softDeleteDocument(selectedItem.id, { isResult: false });
+          toast.success('File soft deleted');
+        } else if (selectedItem.type === 'result_file') {
+          await adminAPI.softDeleteDocument(selectedItem.id.replace('_result', ''), { isResult: true });
+          toast.success('Result file soft deleted');
+        }
+        setSelectedItem(null);
+        load();
+        setConfirmState(s => ({...s, open: false}));
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Soft delete failed');
+        setConfirmState(s => ({...s, open: false}));
       }
-      setSelectedItem(null);
-      load();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Soft delete failed');
-    }
+    }, variant: 'warning' });
   };
 
   // Folder creation handler (admin: needs to know the target customerId + departmentId from current path)
@@ -804,13 +866,21 @@ export default function AdminDocumentsExplorer() {
                   <span className="text-xs font-semibold text-blue-700">Upload files into this folder</span>
                   <button onClick={() => setShowUploadFiles(false)} className="ml-auto p-0.5 hover:bg-blue-100 rounded"><X className="w-3.5 h-3.5 text-blue-500" /></button>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  onChange={e => setUploadFiles(Array.from(e.target.files || []))}
-                  className="block w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
-                />
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                  onDragLeave={() => setIsDragOver(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsDragOver(false); const droppedFiles = Array.from(e.dataTransfer.files || []); if (droppedFiles.length > 0) setUploadFiles(prev => [...prev, ...droppedFiles]); }}
+                  className={`border-2 border-dashed rounded-lg p-4 text-center ${isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`}
+                >
+                  {isDragOver && <p className="text-sm text-blue-600 font-semibold">Drop files here</p>}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    onChange={e => setUploadFiles(Array.from(e.target.files || []))}
+                    className="block w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
+                  />
+                </div>
                 {uploadFiles.length > 0 && (
                   <p className="text-[10px] text-blue-600">{uploadFiles.length} file(s) selected</p>
                 )}
@@ -883,7 +953,8 @@ export default function AdminDocumentsExplorer() {
                 {explorerItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center text-center py-20 text-gray-400 gap-2">
                     <Folder className="w-12 h-12 text-amber-300 fill-amber-100/50" />
-                    <span className="text-xs font-semibold">Folder is empty</span>
+                    <p className="text-sm font-medium">No items</p>
+                    <p className="text-xs mt-1">Navigate to a request folder and upload files, or create a new folder</p>
                   </div>
                 ) : viewMode === 'grid' ? (
                   /* Grid view */
@@ -923,6 +994,7 @@ export default function AdminDocumentsExplorer() {
                           {isFolder ? (
                             <div className="relative">
                               <Folder
+                                title={`${item.name} — ${item.type} (${item.itemCount} items)`}
                                 className={`w-12 h-12 ${
                                   item.type === 'customer'
                                     ? 'text-amber-600 fill-amber-200/80'
@@ -937,12 +1009,12 @@ export default function AdminDocumentsExplorer() {
                             </div>
                           ) : item.type === 'result_file' ? (
                             <div className="relative">
-                              <FileText className="w-12 h-12 text-green-500 fill-green-50" />
+                              <FileText title={`${item.name} — Result File (${formatFileSize(item.fileSize)})`} className="w-12 h-12 text-green-500 fill-green-50" />
                               <CheckCircle className="w-3.5 h-3.5 text-green-600 bg-white rounded-full absolute -bottom-0.5 -right-0.5" />
                             </div>
                           ) : (
                             <div className="relative">
-                              <FileText className="w-12 h-12 text-blue-600 fill-white" />
+                              <FileText title={`${item.name} — ${item.status} (${formatFileSize(item.fileSize)})`} className="w-12 h-12 text-blue-600 fill-white" />
                               {item.doc?.resultFile && (
                                 <CheckCircle className="w-3 h-3 text-green-600 bg-white rounded-full absolute -bottom-0.5 -right-0.5" />
                               )}
@@ -1018,7 +1090,7 @@ export default function AdminDocumentsExplorer() {
                                 ) : (
                                   <File className="w-3.5 h-3.5 text-blue-600 fill-white shrink-0" />
                                 )}
-                                <span className="truncate">{item.name}</span>
+                                <span className="truncate" title={`${item.name} — ${item.type}${item.status ? ` (${item.status})` : ''}${item.fileSize ? ` [${formatFileSize(item.fileSize)}]` : ''}`}>{item.name}</span>
                               </td>
                               <td className="py-2 px-3 text-gray-500 capitalize">{item.type === 'customer' ? 'Customer Space' : item.type === 'dept' ? 'Department Folder' : item.type === 'request' ? 'Request Batch' : 'Document File'}</td>
                               <td className="py-2 px-3 text-gray-500">{isFolder ? `${item.itemCount} items` : formatFileSize(item.fileSize)}</td>
@@ -1035,6 +1107,26 @@ export default function AdminDocumentsExplorer() {
                     </table>
                   </div>
                 )}
+                {/* Pagination Controls */}
+                <div className="mt-4 flex items-center justify-between border-t pt-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Rows per page:</span>
+                    <select
+                      value={limit}
+                      onChange={(e) => {
+                        setLimit(parseInt(e.target.value));
+                        setPage(1);
+                      }}
+                      className="text-xs border rounded px-2 py-1 outline-none bg-white font-semibold text-gray-700 hover:bg-gray-50 cursor-pointer"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                  <Pagination page={page} pages={pages} onPageChange={setPage} />
+                </div>
               </div>
             )}
           </div>
@@ -1358,6 +1450,8 @@ export default function AdminDocumentsExplorer() {
           </div>
 
         </div>
+
+        <ConfirmModal isOpen={confirmState.open} onClose={() => setConfirmState(s => ({ ...s, open: false }))} onConfirm={confirmState.onConfirm} title={confirmState.title} message={confirmState.message} confirmText={confirmState.confirmText || 'Confirm'} variant={confirmState.variant} />
       </div>
   );
 }

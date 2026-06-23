@@ -4,8 +4,11 @@ import { adminAPI } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import Modal from '@/components/ui/Modal';
-import { Plus, Search, Eye, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, RefreshCw, Pencil, Users } from 'lucide-react';
 import { formatDate, copyToClipboard } from '@/lib/utils';
+import Link from 'next/link';
+import ConfirmModal from '@/components/ui/ConfirmModal';
+import SkeletonTable from '@/components/ui/SkeletonTable';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -17,6 +20,7 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState(null);
   const [passwordMode, setPasswordMode] = useState('auto');
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null });
   const router = useRouter();
 
   const loadCustomers = () => {
@@ -72,14 +76,7 @@ export default function CustomersPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this customer and all their documents?')) return;
-    try {
-      await adminAPI.deleteCustomer(id);
-      toast.success('Customer deleted');
-      loadCustomers();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    setConfirmDelete({ open: true, id });
   };
 
   const handleResetPassword = async (id) => {
@@ -130,6 +127,8 @@ export default function CustomersPage() {
         </button>
       </div>
 
+      <nav className="flex items-center gap-1 text-xs text-gray-500 mb-4"><Link href="/admin/dashboard" className="hover:text-blue-600">Dashboard</Link><span>/</span><span className="text-gray-800 font-medium">Customers</span></nav>
+
       <div className="mb-4 relative">
         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search customers..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm" />
@@ -156,9 +155,9 @@ export default function CustomersPage() {
           </thead>
           <tbody className="divide-y">
             {loading ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">Loading...</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-gray-500"><SkeletonTable rows={5} cols={5} /></td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-8 text-gray-500">No customers found</td></tr>
+              <tr><td colSpan={5}><div className="flex flex-col items-center py-12 text-gray-400"><Users className="w-12 h-12 mb-3 text-gray-300" /><p className="text-sm font-medium">No customers yet</p><p className="text-xs mt-1">Click "Add Customer" to get started</p></div></td></tr>
             ) : filtered.map((c) => (
               <tr key={c._id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium">{c.name}</td>
@@ -247,6 +246,8 @@ export default function CustomersPage() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmModal isOpen={confirmDelete.open} onClose={() => setConfirmDelete({ open: false, id: null })} onConfirm={async () => { await adminAPI.deleteCustomer(confirmDelete.id); toast.success('Customer deleted'); loadCustomers(); setConfirmDelete({ open: false, id: null }); }} title="Delete Customer" message="Delete this customer and all their documents?" confirmText="Delete" variant="danger" />
 
     </div>
   );

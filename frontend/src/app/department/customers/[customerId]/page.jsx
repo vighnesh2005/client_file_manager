@@ -4,6 +4,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { departmentAPI } from '@/lib/api';
 import { toast } from 'sonner';
 import StatusBadge from '@/components/ui/StatusBadge';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 import SlaBadge from '@/components/ui/SlaBadge';
 import { formatDateTime, formatFileSize, getSlaStatus } from '@/lib/utils';
 import Link from 'next/link';
@@ -51,6 +52,10 @@ export default function DeptCustomerDocsExplorer() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [confirmState, setConfirmState] = useState({ open: false, title: '', message: '', onConfirm: null });
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Navigation stack state
   const [currentPath, setCurrentPath] = useState([]); // [{ id, name, type: 'request' }]
@@ -76,6 +81,95 @@ export default function DeptCustomerDocsExplorer() {
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
+
+  useEffect(() => {
+    if (selectedItem && (selectedItem.type === 'submission' || selectedItem.type === 'result')) {
+      const isDeleted = selectedItem.type === 'result'
+        ? selectedItem.doc?.resultFileDeletedFromStorage
+        : selectedItem.doc?.fileDeletedFromStorage;
+      
+      if (isDeleted) {
+        setPreviewUrl(null);
+        return;
+      }
+
+      setLoadingPreview(true);
+      setPreviewUrl(null);
+
+      departmentAPI.downloadFile(selectedItem.doc?._id || selectedItem.id, selectedItem.type)
+        .then(res => {
+          const blob = new Blob([res.data], { type: selectedItem.mimeType || res.headers['content-type'] });
+          const url = window.URL.createObjectURL(blob);
+          setPreviewUrl(url);
+        })
+        .catch(err => {
+          console.error('Failed to load preview:', err);
+          setPreviewUrl(null);
+        })
+        .finally(() => {
+          setLoadingPreview(false);
+        });
+    } else {
+      setPreviewUrl(null);
+    }
+
+    return () => {
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [selectedItem]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Delete' && selectedItem && canDelete) {
+        e.preventDefault();
+        handleDeleteClick();
+      }
+      if (e.key === 'F2' && selectedItem && canRename) {
+        e.preventDefault();
+        setIsRenaming(true);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n' && canCreate) {
+        e.preventDefault();
+        setShowCreateFolder(true);
+        setNewFolderName('');
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e' && canCreate) {
+        e.preventDefault();
+        setShowUploadFilesPanel(true);
+        setUploadFilesList([]);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowUp') { e.preventDefault(); handleUp(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowLeft') { e.preventDefault(); handleBack(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'ArrowRight') { e.preventDefault(); handleForward(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedItem, canDelete, canRename, canCreate, handleUp, handleBack, handleForward]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (uploadFilesList.length > 0 || isRenaming || newFolderName.trim() !== '') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [uploadFilesList, isRenaming, newFolderName]);
+
+  useEffect(() => {
+    const name = docs[0]?.customerId?.name;
+    if (customerId && name) {
+      const item = { id: customerId, name, path: `/department/customers/${customerId}`, time: Date.now() };
+      let items = JSON.parse(localStorage.getItem('recent_dept') || '[]');
+      items = items.filter(i => i.id !== customerId);
+      items.unshift(item);
+      items = items.slice(0, 5);
+      localStorage.setItem('recent_dept', JSON.stringify(items));
+    }
+  }, [customerId, docs]);
 
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -314,16 +408,22 @@ export default function DeptCustomerDocsExplorer() {
   };
 
   const handlePurgeFiles = async (docId) => {
-    if (!confirm('Are you sure you want to purge all physical files for this request/group from storage? The database metadata logs will still be preserved.')) {
-      return;
-    }
-    try {
-      await departmentAPI.purgeDocumentFiles(docId);
-      toast.success('Files successfully purged from storage');
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Purge failed');
-    }
+    setConfirmState({
+      open: true,
+      title: 'Purge Files',
+      message: 'Are you sure you want to purge all physical files for this request/group from storage? The database metadata logs will still be preserved.',
+      onConfirm: async () => {
+        try {
+          await departmentAPI.purgeDocumentFiles(docId);
+          toast.success('Files successfully purged from storage');
+          loadData();
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Purge failed');
+        } finally {
+          setConfirmState(s => ({ ...s, open: false }));
+        }
+      }
+    });
   };
 
   const handleHeaderClick = (field) => {
@@ -368,24 +468,31 @@ export default function DeptCustomerDocsExplorer() {
       ? 'Are you sure you want to delete this folder and all files inside? The files will be purged from storage, but database records will be kept.'
       : 'Are you sure you want to delete this file? The file content will be purged from storage, but the database record will be kept.';
       
-    if (!confirm(message)) return;
-    
-    try {
-      if (isFolder) {
-        await departmentAPI.deleteGroup(selectedItem.id);
-        toast.success('Folder deleted successfully');
-      } else if (selectedItem.type === 'submission') {
-        await departmentAPI.deleteDocument(selectedItem.id, { isResult: false });
-        toast.success('File deleted successfully');
-      } else if (selectedItem.type === 'result') {
-        await departmentAPI.deleteDocument(selectedItem.id.replace('_result', ''), { isResult: true });
-        toast.success('Result file deleted successfully');
+    setConfirmState({
+      open: true,
+      title: isFolder ? 'Delete Folder' : 'Delete File',
+      message,
+      onConfirm: async () => {
+        try {
+          if (isFolder) {
+            await departmentAPI.deleteGroup(selectedItem.id);
+            toast.success('Folder deleted successfully');
+          } else if (selectedItem.type === 'submission') {
+            await departmentAPI.deleteDocument(selectedItem.id, { isResult: false });
+            toast.success('File deleted successfully');
+          } else if (selectedItem.type === 'result') {
+            await departmentAPI.deleteDocument(selectedItem.id.replace('_result', ''), { isResult: true });
+            toast.success('Result file deleted successfully');
+          }
+          setSelectedItem(null);
+          loadData();
+        } catch (err) {
+          toast.error(err.response?.data?.message || 'Failed to delete');
+        } finally {
+          setConfirmState(s => ({ ...s, open: false }));
+        }
       }
-      setSelectedItem(null);
-      loadData();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete');
-    }
+    });
   };
 
   const navigateToPath = (newPath) => {
@@ -797,7 +904,23 @@ export default function DeptCustomerDocsExplorer() {
 
             {/* Upload Files inline panel */}
             {showUploadFilesPanel && (
-              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  const droppedFiles = Array.from(e.dataTransfer.files || []);
+                  if (droppedFiles.length > 0) {
+                    setUploadFilesList(prev => [...prev, ...droppedFiles]);
+                  }
+                }}
+                className={`mb-3 p-3 rounded-lg space-y-2 border-2 transition ${
+                  isDragOver
+                    ? 'border-blue-500 bg-blue-100/50'
+                    : 'bg-blue-50 border-blue-200 border-dashed'
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <Upload className="w-4 h-4 text-blue-600 shrink-0" />
                   <span className="text-xs font-semibold text-blue-700">Upload files into this folder</span>
@@ -810,12 +933,24 @@ export default function DeptCustomerDocsExplorer() {
                   onChange={e => setUploadFilesList(Array.from(e.target.files || []))}
                   className="block w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200"
                 />
-                {uploadFilesList.length > 0 && <p className="text-[10px] text-blue-600">{uploadFilesList.length} file(s) selected</p>}
-                <div className="flex gap-2">
+                {uploadFilesList.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] text-blue-600 font-semibold">{uploadFilesList.length} file(s) selected:</p>
+                    <div className="max-h-20 overflow-y-auto text-[9px] text-gray-500 space-y-0.5">
+                      {uploadFilesList.map((f, i) => (
+                        <div key={i} className="flex justify-between items-center bg-white px-1.5 py-0.5 rounded border">
+                          <span className="truncate">{f.name}</span>
+                          <span>({(f.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2 pt-1">
                   <button onClick={handleUploadFilesToFolder} disabled={uploadingFiles || uploadFilesList.length === 0} className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
                     {uploadingFiles ? 'Uploading...' : 'Upload'}
                   </button>
-                  <button onClick={() => setShowUploadFilesPanel(false)} className="px-2 py-1 border rounded text-xs text-gray-600 hover:bg-gray-100">Cancel</button>
+                  <button onClick={() => { setShowUploadFilesPanel(false); setUploadFilesList([]); }} className="px-2 py-1 border rounded text-xs text-gray-600 hover:bg-gray-100">Cancel</button>
                 </div>
               </div>
             )}
@@ -1048,14 +1183,37 @@ export default function DeptCustomerDocsExplorer() {
                   </button>
                 </div>
 
-                {/* Preview Graphic */}
-                <div className="p-8 bg-white border border-[#e5e7eb] rounded-lg flex items-center justify-center shadow-xs">
-                  {selectedItem.type === 'request' ? (
+                {/* Preview Graphic / Inline Preview */}
+                <div className="p-1 bg-white border border-[#e5e7eb] rounded-lg flex items-center justify-center shadow-xs overflow-hidden h-48 w-full relative">
+                  {loadingPreview ? (
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+                      <span className="text-[10px] text-gray-400">Loading preview...</span>
+                    </div>
+                  ) : selectedItem.type === 'request' ? (
                     <Folder className="w-12 h-12 text-amber-600 fill-amber-200/80" />
+                  ) : previewUrl ? (
+                    selectedItem.mimeType?.startsWith('image/') ? (
+                      <img src={previewUrl} alt={selectedItem.name} className="max-h-full max-w-full object-contain" />
+                    ) : selectedItem.mimeType === 'application/pdf' ? (
+                      <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-full border-none" title="PDF Preview" />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center p-4">
+                        <FileText className="w-12 h-12 text-blue-600 fill-white mb-2" />
+                        <span className="text-[10px] text-gray-500 font-semibold truncate max-w-[150px]">{selectedItem.name}</span>
+                        <span className="text-[9px] text-gray-400 mt-0.5">No preview available</span>
+                      </div>
+                    )
                   ) : selectedItem.type === 'result' ? (
-                    <CheckCircle className="w-12 h-12 text-green-500" />
+                    <div className="flex flex-col items-center">
+                      <CheckCircle className="w-12 h-12 text-green-500" />
+                      <span className="text-[9px] text-gray-400 mt-1">Result uploaded</span>
+                    </div>
                   ) : (
-                    <FileText className="w-12 h-12 text-blue-600 fill-white" />
+                    <div className="flex flex-col items-center">
+                      <FileText className="w-12 h-12 text-blue-600 fill-white" />
+                      <span className="text-[9px] text-gray-400 mt-1">No preview</span>
+                    </div>
                   )}
                 </div>
 
@@ -1362,6 +1520,15 @@ export default function DeptCustomerDocsExplorer() {
           </div>
 
       </div>
+      <ConfirmModal
+        isOpen={confirmState.open}
+        onClose={() => setConfirmState(s => ({ ...s, open: false }))}
+        onConfirm={confirmState.onConfirm}
+        title={confirmState.title}
+        message={confirmState.message}
+        confirmText="Proceed"
+        variant="danger"
+      />
     </div>
   );
 }
