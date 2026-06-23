@@ -109,6 +109,15 @@ export default function CustomerLayout({ children }) {
         </div>
       </aside>
 
+      {isMobile && !sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed top-3 left-3 z-50 p-2.5 bg-gray-900 text-white rounded-xl shadow-lg active:scale-95 transition"
+          aria-label="Open sidebar"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
       <main className="flex-1 overflow-auto min-w-0">
         <div className="p-4 sm:p-6">{children}</div>
       </main>
