@@ -198,11 +198,31 @@ export const getCustomerDocuments = async (req, res) => {
 
 export const getDocuments = async (req, res) => {
   const deptId = req.user.departmentId;
-  const { status, customerId } = req.query;
+  const { status, customerId, q } = req.query;
   const query = { departmentId: deptId, direction: 'submission', isDeleted: { $ne: true } };
 
   if (status && typeof status === 'string') query.status = status;
   if (customerId && typeof customerId === 'string') query.customerId = customerId;
+
+  if (q && typeof q === 'string') {
+    const searchRegex = { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    const matchingCustomers = await User.find({
+      role: 'customer',
+      $or: [
+        { name: searchRegex },
+        { email: searchRegex }
+      ]
+    }).select('_id').lean();
+    const customerIds = matchingCustomers.map(c => c._id);
+    query.$or = [
+      { customerId: { $in: customerIds } },
+      { title: searchRegex },
+      { originalName: searchRegex },
+      { customGroupName: searchRegex },
+      { description: searchRegex },
+      { notes: searchRegex },
+    ];
+  }
 
   const page = parseInt(req.query.page);
   const limit = parseInt(req.query.limit);
@@ -212,7 +232,6 @@ export const getDocuments = async (req, res) => {
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -226,7 +245,6 @@ export const getDocuments = async (req, res) => {
   } else {
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .lean();

@@ -8,10 +8,11 @@ import Link from 'next/link';
 import TourOverlay from '@/components/ui/TourOverlay';
 import { motion } from 'framer-motion';
 import {
-  AlertCircle, LayoutDashboard, Users, ChevronLeft, Menu, LogOut, X,
+  AlertCircle, LayoutDashboard, Users, FileSearch, ChevronLeft, Menu, LogOut, X,
 } from 'lucide-react';
 
 const navItems = [
+  { href: '/department/submissions', label: 'Submissions', icon: FileSearch },
   { href: '/department/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/department/customers', label: 'Customers', icon: Users },
 ];
