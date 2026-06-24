@@ -4,6 +4,8 @@ import env from '../config/env.js';
 import Category from '../models/Category.model.js';
 import Document from '../models/Document.model.js';
 import Department from '../models/Department.model.js';
+import User from '../models/User.model.js';
+import Notification from '../models/Notification.model.js';
 import AppError from '../utils/AppError.js';
 import storageService from '../services/storage.service.js';
 import path from 'path';
@@ -142,17 +144,23 @@ export const uploadDocument = async (req, res) => {
     const populatedDocs = await Document.find({ groupId })
       .populate('departmentId', 'name');
 
+    // Notify all department users in this department
+    const deptUsers = await User.find({ departmentId: department._id, role: 'department', isActive: true }).lean();
+    const notifications = deptUsers.map(u => ({
+      userId: u._id,
+      type: 'new_request',
+      message: `${req.user.name} submitted a new request to ${department.name}`,
+      link: `/department/customers/${customerId}`,
+    }));
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
     res.status(201).json({ success: true, data: populatedDocs });
   } catch (error) {
-    // Clean up any files that were successfully moved to final location
+    // Clean up any files uploaded to Supabase
     for (const filePath of savedFilePaths) {
-      if (fs.existsSync(filePath)) {
-        try {
-          fs.unlinkSync(filePath);
-        } catch (err) {
-          console.error(`Failed to clean up saved file ${filePath}:`, err);
-        }
-      }
+      try { await storageService.deleteFile(filePath); } catch (_) {}
     }
     // Clean up any remaining temp files in multer storage
     for (const file of req.files) {
@@ -226,9 +234,54 @@ export const downloadDocument = async (req, res) => {
   const filePath = type === 'result' && doc.resultFile ? doc.resultFile.storedPath : doc.storedPath;
   if (!filePath) throw new AppError('File not found', 404);
 
-  const exists = storageService.getFilePath(filePath);
-  if (!exists) throw new AppError('File not found on storage', 404);
-
   const fileName = type === 'result' && doc.resultFile ? doc.resultFile.originalName : doc.originalName;
-  res.download(exists, fileName);
+  const url = await storageService.getDownloadUrl(filePath, fileName);
+  if (!url) throw new AppError('File not found on storage', 404);
+
+  res.redirect(url);
+};
+
+export const getResponses = async (req, res) => {
+  const customerId = req.user._id;
+  const { fileCategoryId } = req.query;
+  const query = { customerId, direction: 'response', isDeleted: { $ne: true } };
+  if (fileCategoryId && typeof fileCategoryId === 'string') query.fileCategoryId = fileCategoryId;
+
+  const docs = await Document.find(query)
+    .populate('fileCategoryId', 'name')
+    .populate('departmentId', 'name')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.json({ success: true, data: docs });
+};
+
+export const getResponseCategories = async (req, res) => {
+  const customerId = req.user._id;
+
+  const docs = await Document.find({
+    customerId, direction: 'response', isDeleted: { $ne: true },
+    fileCategoryId: { $ne: null },
+  })
+    .populate('fileCategoryId', 'name')
+    .populate('departmentId', 'name')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const grouped = {};
+  for (const doc of docs) {
+    const fcId = doc.fileCategoryId?._id?.toString();
+    if (!fcId) continue;
+    if (!grouped[fcId]) {
+      grouped[fcId] = {
+        _id: doc.fileCategoryId._id,
+        name: doc.fileCategoryId.name,
+        departmentName: doc.departmentId?.name || 'General',
+        documents: [],
+      };
+    }
+    grouped[fcId].documents.push(doc);
+  }
+
+  res.json({ success: true, data: Object.values(grouped) });
 };

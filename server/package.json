@@ -7,9 +7,14 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "seed": "node src/services/seed.service.js"
+    "seed": "node src/services/seed.service.js",
+    "purge-data": "node src/services/purge-data.service.js",
+    "migrate-r2": "node src/services/migrate-to-supabase.service.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -22,5 +27,10 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.2",
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^11.2.0",
+    "supertest": "^7.2.2",
+    "vitest": "^4.1.9"
   }
 }

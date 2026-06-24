@@ -1,32 +1,15 @@
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import env from '../config/env.js';
 import User from '../models/User.model.js';
+import supabase from './supabase.service.js';
 
 class StorageService {
-  ensureDir(dir) {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-  }
-
   async getCustomerFolderName(customerId) {
     const customer = await User.findById(customerId);
     if (!customer) return customerId.toString();
     const safeName = customer.name.replace(/[^a-zA-Z0-9]/g, '_');
     const safeEmail = customer.email.replace(/[^a-zA-Z0-9@.]/g, '_');
-    return path.join(safeName, safeEmail);
-  }
-
-  async getSubmissionDir(customerId, categoryId) {
-    const folder = await this.getCustomerFolderName(customerId);
-    return path.join(env.UPLOAD_DIR, 'customers', folder, categoryId.toString(), 'submissions');
-  }
-
-  async getResultDir(customerId, categoryId) {
-    const folder = await this.getCustomerFolderName(customerId);
-    return path.join(env.UPLOAD_DIR, 'customers', folder, categoryId.toString(), 'results');
+    return `${safeName}_${safeEmail}`;
   }
 
   sanitizeFilename(name) {
@@ -35,60 +18,65 @@ class StorageService {
   }
 
   async saveSubmission(file, customerId, categoryId) {
-    const dir = await this.getSubmissionDir(customerId, categoryId);
-    this.ensureDir(dir);
+    const folder = await this.getCustomerFolderName(customerId);
     const safeName = this.sanitizeFilename(file.originalname);
     const fileName = `${Date.now()}_${safeName}`;
-    const storedPath = path.join(dir, fileName);
-    fs.renameSync(file.path, storedPath);
-    return { storedPath, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
+    const key = `customers/${folder}/${categoryId}/submissions/${fileName}`;
+
+    const buffer = fs.readFileSync(file.path);
+    await supabase.upload(key, buffer, file.mimetype);
+
+    if (fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+    }
+
+    return { storedPath: key, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
   }
 
   async saveResult(file, customerId, categoryId) {
-    const dir = await this.getResultDir(customerId, categoryId);
-    this.ensureDir(dir);
+    const folder = await this.getCustomerFolderName(customerId);
     const safeName = this.sanitizeFilename(file.originalname);
     const fileName = `${Date.now()}_${safeName}`;
-    const storedPath = path.join(dir, fileName);
-    fs.renameSync(file.path, storedPath);
-    return { storedPath, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
+    const key = `customers/${folder}/${categoryId}/results/${fileName}`;
+
+    const buffer = fs.readFileSync(file.path);
+    await supabase.upload(key, buffer, file.mimetype);
+
+    if (fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+    }
+
+    return { storedPath: key, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
   }
 
-  getFilePath(storedPath) {
+  async saveResponse(file, customerId, fileCategoryId) {
+    const folder = await this.getCustomerFolderName(customerId);
+    const safeName = this.sanitizeFilename(file.originalname);
+    const fileName = `${Date.now()}_${safeName}`;
+    const key = `responses/${folder}/${fileCategoryId}/${fileName}`;
+
+    const buffer = fs.readFileSync(file.path);
+    await supabase.upload(key, buffer, file.mimetype);
+
+    if (fs.existsSync(file.path)) {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+    }
+
+    return { storedPath: key, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
+  }
+
+  async getDownloadUrl(storedPath, fileName) {
     if (!storedPath) return null;
-    const normalizedPath = storedPath.replace(/[\\/]/g, path.sep);
-    if (path.isAbsolute(normalizedPath) && fs.existsSync(normalizedPath)) {
-      return normalizedPath;
-    }
-    if (fs.existsSync(normalizedPath)) {
-      return path.resolve(normalizedPath);
-    }
-    const serverDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-    const resolvedPath = path.resolve(serverDir, normalizedPath);
-    if (fs.existsSync(resolvedPath)) {
-      return resolvedPath;
-    }
-    return null;
+    return supabase.getSignedUrl(storedPath, fileName);
   }
 
-  deleteFile(storedPath) {
+  async deleteFile(storedPath) {
+    if (!storedPath) return;
     try {
-      if (fs.existsSync(storedPath)) {
-        fs.unlinkSync(storedPath);
-      }
+      await supabase.delete(storedPath);
     } catch (err) {
-      console.error('Failed to delete file:', err);
+      console.error('Failed to delete file from Supabase:', err);
     }
-  }
-
-  async saveDepartmentResult(file, customerId, categoryId) {
-    const dir = await this.getResultDir(customerId, categoryId);
-    this.ensureDir(dir);
-    const safeName = this.sanitizeFilename(file.originalname);
-    const fileName = `${Date.now()}_${safeName}`;
-    const storedPath = path.join(dir, fileName);
-    fs.renameSync(file.path, storedPath);
-    return { storedPath, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
   }
 }
 

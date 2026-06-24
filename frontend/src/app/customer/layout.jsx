@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import ScrollToTop from '@/components/ui/ScrollToTop';
+import NotificationBell from '@/components/ui/NotificationBell';
 import Link from 'next/link';
 import TourOverlay from '@/components/ui/TourOverlay';
 import { motion } from 'framer-motion';
@@ -13,6 +14,7 @@ import {
 const navItems = [
   { href: '/customer/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/customer/categories', label: 'Categories', icon: FolderTree },
+  { href: '/customer/responses', label: 'Responses', icon: FileText },
   { href: '/customer/upload', label: 'Upload', icon: Upload },
   { href: '/customer/documents', label: 'My Documents', icon: FileText },
 ];
@@ -161,6 +163,9 @@ export default function CustomerLayout({ children }) {
         </button>
       )}
       <main className="flex-1 overflow-auto min-w-0">
+        <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-end px-4 h-10">
+          <NotificationBell />
+        </div>
         <div className={`${isMobile && !sidebarOpen ? 'pt-14' : ''} p-4 sm:p-6`}>
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
             {children}

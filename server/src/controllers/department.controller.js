@@ -2,9 +2,10 @@ import Document from '../models/Document.model.js';
 import User from '../models/User.model.js';
 import Department from '../models/Department.model.js';
 import Category from '../models/Category.model.js';
+import FileCategory from '../models/FileCategory.model.js';
+import Notification from '../models/Notification.model.js';
 import AppError from '../utils/AppError.js';
 import storageService from '../services/storage.service.js';
-import fs from 'fs';
 
 const SLA_MS = 48 * 60 * 60 * 1000;
 const WARNING_MS = 12 * 60 * 60 * 1000;
@@ -13,25 +14,26 @@ export const getDashboard = async (req, res) => {
   const deptId = req.user.departmentId;
   const now = new Date();
 
+  const subFilter = { departmentId: deptId, direction: 'submission' };
   const [totalDocs, pending, processing, completed, blocked, recentDocs, slaOverdue, slaApproaching, slaWithin, slaMet, slaMissed, customers] = await Promise.all([
-    Document.countDocuments({ departmentId: deptId }),
-    Document.countDocuments({ departmentId: deptId, status: 'pending' }),
-    Document.countDocuments({ departmentId: deptId, status: 'processing' }),
-    Document.countDocuments({ departmentId: deptId, status: 'completed' }),
-    Document.countDocuments({ departmentId: deptId, status: 'blocked' }),
-    Document.find({ departmentId: deptId })
+    Document.countDocuments(subFilter),
+    Document.countDocuments({ ...subFilter, status: 'pending' }),
+    Document.countDocuments({ ...subFilter, status: 'processing' }),
+    Document.countDocuments({ ...subFilter, status: 'completed' }),
+    Document.countDocuments({ ...subFilter, status: 'blocked' }),
+    Document.find(subFilter)
       .sort({ createdAt: -1 })
       .limit(10)
       .populate('customerId', 'name email')
       .populate('categoryId', 'name')
       .lean(),
     Document.countDocuments({
-      departmentId: deptId,
+      ...subFilter,
       status: { $in: ['pending', 'processing'] },
       createdAt: { $lt: new Date(now - SLA_MS) },
     }),
     Document.countDocuments({
-      departmentId: deptId,
+      ...subFilter,
       status: { $in: ['pending', 'processing'] },
       createdAt: {
         $gte: new Date(now - SLA_MS),
@@ -39,12 +41,12 @@ export const getDashboard = async (req, res) => {
       },
     }),
     Document.countDocuments({
-      departmentId: deptId,
+      ...subFilter,
       status: { $in: ['pending', 'processing'] },
       createdAt: { $gte: new Date(now - SLA_MS + WARNING_MS) },
     }),
     Document.countDocuments({
-      departmentId: deptId,
+      ...subFilter,
       status: { $in: ['completed', 'blocked'] },
       'resultFile.uploadedAt': { $exists: true },
       $expr: {
@@ -55,7 +57,7 @@ export const getDashboard = async (req, res) => {
       },
     }),
     Document.countDocuments({
-      departmentId: deptId,
+      ...subFilter,
       status: { $in: ['completed', 'blocked'] },
       'resultFile.uploadedAt': { $exists: true },
       $expr: {
@@ -66,7 +68,7 @@ export const getDashboard = async (req, res) => {
       },
     }),
     Document.aggregate([
-      { $match: { departmentId: deptId } },
+      { $match: { departmentId: deptId, direction: 'submission' } },
       { $group: { _id: '$customerId', totalDocs: { $sum: 1 }, pendingDocs: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } }, lastDoc: { $max: '$createdAt' } } },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'customer' } },
       { $unwind: '$customer' },
@@ -85,7 +87,7 @@ export const getCustomers = async (req, res) => {
   const deptId = req.user.departmentId;
   const { filter } = req.query;
 
-  const matchStage = { departmentId: deptId };
+  const matchStage = { departmentId: deptId, direction: 'submission' };
   if (filter === 'completed') {
     matchStage.status = 'completed';
   } else if (filter === 'non_completed') {
@@ -168,7 +170,7 @@ export const getCustomerDocuments = async (req, res) => {
 
   const page = parseInt(req.query.page);
   const limit = parseInt(req.query.limit);
-  const query = { customerId, departmentId: deptId, isDeleted: { $ne: true } };
+  const query = { customerId, departmentId: deptId, direction: 'submission', isDeleted: { $ne: true } };
 
   if (page && limit) {
     const skip = (page - 1) * limit;
@@ -198,7 +200,7 @@ export const getCustomerDocuments = async (req, res) => {
 export const getDocuments = async (req, res) => {
   const deptId = req.user.departmentId;
   const { status, categoryId, customerId } = req.query;
-  const query = { departmentId: deptId, isDeleted: { $ne: true } };
+  const query = { departmentId: deptId, direction: 'submission', isDeleted: { $ne: true } };
 
   if (status && typeof status === 'string') query.status = status;
   if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
@@ -304,55 +306,76 @@ export const getCategories = async (req, res) => {
   res.json({ success: true, data: categories });
 };
 
-export const uploadResult = async (req, res) => {
+export const createResponse = async (req, res) => {
   const deptId = req.user.departmentId;
-  const { id } = req.params;
-  const { categoryId } = req.body;
+  const { customerId, fileCategoryId, notes } = req.body;
 
-  if (!categoryId) throw new AppError('Category ID is required for results', 400);
+  if (!customerId) throw new AppError('Customer ID is required', 400);
+  if (!fileCategoryId) throw new AppError('File category ID is required', 400);
+  if (!req.file) throw new AppError('Response file is required', 400);
 
-  const category = await Category.findById(categoryId);
-  if (!category || !category.isActive) {
-    throw new AppError('Category not found or inactive', 404);
+  const fileCategory = await FileCategory.findById(fileCategoryId);
+  if (!fileCategory || !fileCategory.isActive) {
+    throw new AppError('File category not found or inactive', 404);
   }
-  if (category.departmentId.toString() !== deptId.toString()) {
-    throw new AppError('Category does not belong to this department', 400);
+  if (fileCategory.departmentId.toString() !== deptId.toString()) {
+    throw new AppError('File category does not belong to this department', 400);
   }
 
-  const doc = await Document.findOne({ _id: id, departmentId: deptId });
-  if (!doc) throw new AppError('Document not found', 404);
-  if (!req.file) throw new AppError('Result file is required', 400);
+  const customer = await User.findById(customerId);
+  if (!customer) throw new AppError('Customer not found', 404);
 
-  const resultInfo = await storageService.saveDepartmentResult(
-    req.file,
-    doc.customerId,
-    category._id
-  );
+  const fileInfo = await storageService.saveResponse(req.file, customerId, fileCategoryId);
 
-  doc.categoryId = category._id;
-  doc.resultFile = {
-    ...resultInfo,
-    uploadedBy: req.user._id,
-    uploadedAt: new Date(),
-  };
-  doc.status = 'completed';
-  doc.direction = 'result';
-  await doc.save();
+  const doc = await Document.create({
+    customerId,
+    departmentId: deptId,
+    fileCategoryId,
+    direction: 'response',
+    title: req.file.originalname,
+    notes: notes || '',
+    ...fileInfo,
+    status: 'completed',
+  });
 
-  // Synchronize status to completed for non-blocked files in this group
-  if (doc.groupId) {
-    await Document.updateMany(
-      { groupId: doc.groupId, departmentId: deptId, _id: { $ne: doc._id }, paymentBlocked: { $ne: true } },
-      { status: 'completed' }
-    );
-  }
+  // Notify the customer
+  const dept = await Department.findById(deptId);
+  await Notification.create({
+    userId: customerId,
+    type: 'new_response',
+    message: `${dept.name} uploaded a new document: ${fileInfo.originalName}`,
+    link: '/customer/responses',
+  });
 
   const populated = await Document.findById(doc._id)
     .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
-    .populate('resultFile.uploadedBy', 'name');
+    .populate('fileCategoryId', 'name')
+    .populate('departmentId', 'name');
 
-  res.json({ success: true, data: populated });
+  res.status(201).json({ success: true, data: populated });
+};
+
+export const getResponses = async (req, res) => {
+  const deptId = req.user.departmentId;
+  const { customerId } = req.query;
+  const query = { departmentId: deptId, direction: 'response', isDeleted: { $ne: true } };
+  if (customerId) query.customerId = customerId;
+
+  const docs = await Document.find(query)
+    .populate('customerId', 'name email')
+    .populate('fileCategoryId', 'name')
+    .sort({ createdAt: -1 })
+    .lean();
+
+  res.json({ success: true, data: docs });
+};
+
+export const getDepartmentFileCategories = async (req, res) => {
+  const deptId = req.user.departmentId;
+  const fileCategories = await FileCategory.find({ departmentId: deptId, isActive: true })
+    .sort({ name: 1 })
+    .lean();
+  res.json({ success: true, data: fileCategories });
 };
 
 export const blockDocument = async (req, res) => {
@@ -469,10 +492,10 @@ export const downloadFile = async (req, res) => {
   const fileName = type === 'result' && doc.resultFile ? doc.resultFile.originalName : doc.originalName;
 
   if (!filePath) throw new AppError('File not found', 404);
-  const exists = storageService.getFilePath(filePath);
-  if (!exists) throw new AppError('File not found on storage', 404);
+  const url = await storageService.getDownloadUrl(filePath, fileName);
+  if (!url) throw new AppError('File not found on storage', 404);
 
-  res.download(exists, fileName);
+  res.redirect(url);
 };
 
 export const departmentPurgeDocumentFiles = async (req, res) => {
@@ -493,9 +516,7 @@ export const departmentPurgeDocumentFiles = async (req, res) => {
     let itemModified = false;
     if (item.storedPath && !item.fileDeletedFromStorage) {
       try {
-        if (fs.existsSync(item.storedPath)) {
-          fs.unlinkSync(item.storedPath);
-        }
+        await storageService.deleteFile(item.storedPath);
         item.fileDeletedFromStorage = true;
         itemModified = true;
         totalFilesDeleted++;
@@ -505,9 +526,7 @@ export const departmentPurgeDocumentFiles = async (req, res) => {
     }
     if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
       try {
-        if (fs.existsSync(item.resultFile.storedPath)) {
-          fs.unlinkSync(item.resultFile.storedPath);
-        }
+        await storageService.deleteFile(item.resultFile.storedPath);
         item.resultFileDeletedFromStorage = true;
         itemModified = true;
         totalFilesDeleted++;
@@ -650,10 +669,10 @@ export const departmentBatchDocuments = async (req, res) => {
         }
         for (const item of docsToPurge) {
           if (item.storedPath && !item.fileDeletedFromStorage) {
-            try { if (fs.existsSync(item.storedPath)) fs.unlinkSync(item.storedPath); } catch (_) {}
+            try { await storageService.deleteFile(item.storedPath); } catch (_) {}
           }
           if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
-            try { if (fs.existsSync(item.resultFile.storedPath)) fs.unlinkSync(item.resultFile.storedPath); } catch (_) {}
+            try { await storageService.deleteFile(item.resultFile.storedPath); } catch (_) {}
           }
           item.isDeleted = true;
           item.purgedAt = new Date();

@@ -70,6 +70,19 @@ export default function DeptCustomerDocsExplorer() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
   const panelRef = useRef(null);
+
+  // Create Response state
+  const [fileCategories, setFileCategories] = useState([]);
+  const [selectedFileCategory, setSelectedFileCategory] = useState('');
+  const [responseNotes, setResponseNotes] = useState('');
+  const [responseFile, setResponseFile] = useState(null);
+  const [creatingResponse, setCreatingResponse] = useState(false);
+  const responseFileInputRef = useRef(null);
+
+  // Toggle between Requests and Responses view
+  const [explorerMode, setExplorerMode] = useState('requests'); // 'requests' | 'responses'
+  const [responseDocs, setResponseDocs] = useState([]);
+  const [loadingResponses, setLoadingResponses] = useState(false);
   const isResizing = useRef(false);
   const [panelWidth, setPanelWidth] = useState(288);
   const [isMobile, setIsMobile] = useState(false);
@@ -241,6 +254,27 @@ export default function DeptCustomerDocsExplorer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerId]);
 
+  // Load file categories for response creation
+  useEffect(() => {
+    departmentAPI.getFileCategories()
+      .then(res => {
+        if (res.data?.data) setFileCategories(res.data.data);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load response documents when switching to responses mode
+  useEffect(() => {
+    if (explorerMode !== 'responses') return;
+    setLoadingResponses(true);
+    departmentAPI.getResponses({ customerId })
+      .then(res => {
+        if (res.data?.data) setResponseDocs(res.data.data);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingResponses(false));
+  }, [explorerMode, customerId]);
+
   useEffect(() => {
     Promise.resolve().then(() => {
       if (docs.length > 0 && openGroupId) {
@@ -342,28 +376,35 @@ export default function DeptCustomerDocsExplorer() {
     }
   };
 
-  const handleUploadResult = async (e, docId) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!selectedCat) {
-      toast.error('Please select a category first');
-      if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleCreateResponse = async () => {
+    if (!responseFile) {
+      toast.error('Please select a file to upload');
       return;
     }
-    setUploading(true);
+    if (!selectedFileCategory) {
+      toast.error('Please select a file category');
+      return;
+    }
+    setCreatingResponse(true);
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('categoryId', selectedCat);
+    formData.append('file', responseFile);
+    formData.append('customerId', customerId);
+    formData.append('fileCategoryId', selectedFileCategory);
+    formData.append('notes', responseNotes);
     try {
-      await departmentAPI.uploadResult(docId, formData);
-      toast.success('Result file uploaded');
-      setSelectedCat('');
+      await departmentAPI.createResponse(formData);
+      toast.success('Response document uploaded successfully');
+      setSelectedFileCategory('');
+      setResponseNotes('');
+      setResponseFile(null);
+      if (responseFileInputRef.current) responseFileInputRef.current.value = '';
       loadData();
+      // Switch to responses view to show the new response
+      setExplorerMode('responses');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed');
+      toast.error(err.response?.data?.message || 'Failed to create response');
     } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setCreatingResponse(false);
     }
   };
 
@@ -629,21 +670,9 @@ export default function DeptCustomerDocsExplorer() {
         mimeType: d.mimeType,
         status: d.status,
         createdAt: d.createdAt,
+        description: d.description,
         doc: d
       });
-      // Result file
-      if (d.resultFile) {
-        explorerItems.push({
-          id: `${d._id}_result`,
-          name: `Result_${d.resultFile.originalName}`,
-          type: 'result',
-          fileSize: d.resultFile.fileSize,
-          mimeType: d.mimeType,
-          status: d.status,
-          createdAt: d.resultFile.uploadedAt,
-          doc: d
-        });
-      }
     }
   }
 
@@ -802,6 +831,7 @@ export default function DeptCustomerDocsExplorer() {
         <div className="flex flex-row flex-1 overflow-hidden">
           
           {/* Left Tree Directory Sidebar */}
+          {explorerMode === 'requests' && (
           <div className="w-52 bg-white border-r border-[#e5e7eb] h-full overflow-y-auto shrink-0 flex flex-col p-2 text-xs text-gray-700">
             {/* Navigation Block */}
             <div className="mb-3 border-b pb-2">
@@ -853,10 +883,37 @@ export default function DeptCustomerDocsExplorer() {
               </div>
             </div>
           </div>
+          )}
 
           {/* Center Files Pane */}
           <div className="flex-1 bg-white h-full overflow-y-auto p-4 flex flex-col">
 
+            {/* Explorer Mode Toggle: Requests | Responses */}
+            <div className="flex items-center gap-1 mb-3 border-b border-gray-200 pb-2">
+              <button
+                onClick={() => setExplorerMode('requests')}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
+                  explorerMode === 'requests'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Requests
+              </button>
+              <button
+                onClick={() => setExplorerMode('responses')}
+                className={`px-3 py-1.5 rounded text-xs font-semibold transition ${
+                  explorerMode === 'responses'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                Responses
+              </button>
+            </div>
+
+            {explorerMode === 'requests' ? (
+              <>
             {/* Create Folder / Upload File toolbar – visible for dept users with canCreate */}
             {!isSearching && canCreate && (
               <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -1069,8 +1126,12 @@ export default function DeptCustomerDocsExplorer() {
                           <span className="text-[11px] font-medium text-gray-700 mt-2 truncate w-full" title={item.name}>
                             {item.name}
                           </span>
+                          {item.type === 'submission' && item.description && (
+                            <span className="text-[9px] text-gray-400 mt-0.5 line-clamp-2 text-left w-full px-1 italic" title={item.description}>
+                              &ldquo;{item.description.substring(0, 80)}{item.description.length > 80 ? '...' : ''}&rdquo;
+                            </span>
+                          )}
                           <div className="mt-1 flex flex-col items-center gap-0.5">
-                            {item.slaStatus && item.status !== 'completed' && item.status !== 'blocked' && <SlaBadge slaStatus={item.slaStatus} />}
                             {item.status && <StatusBadge status={item.status} />}
                           </div>
                         </div>
@@ -1084,6 +1145,7 @@ export default function DeptCustomerDocsExplorer() {
                       <thead>
                         <tr className="border-b border-[#e5e7eb] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer">
                           <th className="py-2.5 px-3 hover:text-blue-600" onClick={() => handleHeaderClick('name')}>Name {sortField === 'name' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}</th>
+                          <th className="py-2.5 px-3">Description</th>
                           <th className="py-2.5 px-3 hover:text-blue-600" onClick={() => handleHeaderClick('type')}>Type {sortField === 'type' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}</th>
                           <th className="py-2.5 px-3 hover:text-blue-600" onClick={() => handleHeaderClick('size')}>Size {sortField === 'size' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}</th>
                           <th className="py-2.5 px-3 text-center hover:text-blue-600" onClick={() => handleHeaderClick('status')}>Status {sortField === 'status' ? (sortOrder === 'asc' ? ' ▲' : ' ▼') : ''}</th>
@@ -1130,6 +1192,12 @@ export default function DeptCustomerDocsExplorer() {
                                 )}
                                 <span className="truncate">{item.name}</span>
                               </td>
+                              <td className="py-2 px-3 text-gray-400 italic text-[10px] max-w-[200px] truncate">
+                                {item.type === 'submission' && item.description
+                                  ? `&ldquo;${item.description.substring(0, 60)}${item.description.length > 60 ? '...' : ''}&rdquo;`
+                                  : item.type === 'request' ? `${item.itemCount || ''} item(s)` : '-'
+                                }
+                              </td>
                               <td className="py-2 px-3 text-gray-500 capitalize">{item.type === 'request' ? 'Request batch' : 'File'}</td>
                               <td className="py-2 px-3 text-gray-500">{isFolder ? `${item.itemCount} items` : formatFileSize(item.fileSize)}</td>
                               <td className="py-2 px-3 text-center">
@@ -1143,6 +1211,73 @@ export default function DeptCustomerDocsExplorer() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </div>
+            )}
+              </>
+            ) : (
+              /* ── Responses View ── */
+              <div className="flex-1">
+                {loadingResponses ? (
+                  <div className="animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg" />)}</div>
+                ) : responseDocs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center py-20 text-gray-400 gap-2">
+                    <FileText className="w-12 h-12 text-gray-300" />
+                    <span className="text-xs font-semibold">No response documents yet</span>
+                    <span className="text-[10px]">Switch to Requests view to create a response</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Response Documents ({responseDocs.length})</span>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead>
+                          <tr className="border-b border-gray-200 font-semibold text-gray-400 uppercase tracking-wider">
+                            <th className="py-2 px-3">Name</th>
+                            <th className="py-2 px-3">File Category</th>
+                            <th className="py-2 px-3">Customer</th>
+                            <th className="py-2 px-3">Date</th>
+                            <th className="py-2 px-3">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {responseDocs.map(doc => (
+                            <tr key={doc._id} className="hover:bg-gray-50">
+                              <td className="py-2.5 px-3 flex items-center gap-2">
+                                <FileText className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                <span className="truncate font-medium">{doc.title || doc.originalName}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-gray-600">{doc.fileCategoryId?.name || '-'}</td>
+                              <td className="py-2.5 px-3 text-gray-600">{doc.customerId?.name || '-'}</td>
+                              <td className="py-2.5 px-3 text-gray-500">{new Date(doc.createdAt).toLocaleDateString()}</td>
+                              <td className="py-2.5 px-3">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await departmentAPI.downloadFile(doc._id, 'submission');
+                                      const url = window.URL.createObjectURL(new Blob([res.data]));
+                                      const a = document.createElement('a');
+                                      a.href = url;
+                                      a.download = doc.originalName || 'download';
+                                      document.body.appendChild(a);
+                                      a.click();
+                                      a.remove();
+                                      window.URL.revokeObjectURL(url);
+                                    } catch (err) {
+                                      toast.error('Download failed');
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-[9px] font-semibold hover:bg-blue-100"
+                                >
+                                  Download
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1299,23 +1434,6 @@ export default function DeptCustomerDocsExplorer() {
                   )}
                 </div>
 
-                {/* Requires Result Callout */}
-                {(selectedItem.type === 'submission' || selectedItem.type === 'result') && (
-                  <div className="border-t border-[#e5e7eb] pt-3 text-[11px]">
-                    {selectedItem.doc.requiresResult ? (
-                      <div className="p-2 bg-blue-50 border border-blue-100 rounded-md text-blue-800 flex items-start gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
-                        <span><strong>Expected:</strong> This request expects a response file.</span>
-                      </div>
-                    ) : (
-                      <div className="p-2 bg-gray-50 border border-gray-200 rounded-md text-gray-600 flex items-start gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
-                        <span>No result file is expected.</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Internal Notes Edit Area */}
                 {(selectedItem.type === 'submission' || selectedItem.type === 'result') && (
                   <div className="border-t border-[#e5e7eb] pt-3 space-y-1.5">
@@ -1388,44 +1506,90 @@ export default function DeptCustomerDocsExplorer() {
                   </div>
                 )}
 
-                {/* Upload Result Block (Only for submission files, if result is expected) */}
-                {selectedItem.type === 'submission' && selectedItem.doc.requiresResult && (
-                  <div className="border-t border-[#e5e7eb] pt-3 space-y-2">
-                    <span className="text-[11px] font-semibold text-gray-755 block">Upload Result File</span>
-                    {!selectedItem.doc.resultFile ? (
-                      <div className="space-y-1.5">
-                        <div>
-                          <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Result Category (Required)</label>
-                          <select
-                            value={selectedCat}
-                            onChange={(e) => setSelectedCat(e.target.value)}
-                            className="w-full px-2 py-1.5 border rounded text-[11px] bg-white outline-none focus:ring-1 focus:ring-blue-500"
-                            required
-                          >
-                            <option value="">Select category</option>
-                            {categories.map(c => (
-                              <option key={c._id} value={c._id}>{c.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Select File</label>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            onChange={(e) => handleUploadResult(e, selectedItem.doc._id)}
-                            disabled={uploading || !selectedCat}
-                            className="block w-full text-[10px] text-gray-550 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-                          />
-                          {uploading && <p className="text-[9px] text-gray-500 mt-1">Uploading...</p>}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-2 bg-green-50 border border-green-150 rounded text-[11px] font-semibold text-green-800 flex items-center gap-1">
-                        <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                        <span>Result uploaded successfully.</span>
+                {/* Create Response Section — available for all submission files */}
+                {selectedItem.type === 'submission' && (
+                  <div className="border-t border-[#e5e7eb] pt-3 space-y-3">
+                    <span className="text-[11px] font-semibold text-gray-755 block">Create Response Document</span>
+
+                    {/* Customer description */}
+                    {selectedItem.description && (
+                      <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-lg text-blue-900">
+                        <span className="text-[9px] uppercase font-extrabold tracking-wider">Customer Request</span>
+                        <p className="mt-0.5 text-xs font-normal italic leading-relaxed whitespace-pre-wrap">
+                          &ldquo;{selectedItem.description}&rdquo;
+                        </p>
                       </div>
                     )}
+
+                    {/* File Category */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">File Category (Required)</label>
+                      <select
+                        value={selectedFileCategory}
+                        onChange={(e) => setSelectedFileCategory(e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-[11px] bg-white outline-none focus:ring-1 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select file category</option>
+                        {fileCategories.map(fc => (
+                          <option key={fc._id} value={fc._id}>{fc.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Notes (optional)</label>
+                      <textarea
+                        value={responseNotes}
+                        onChange={(e) => setResponseNotes(e.target.value)}
+                        rows={2}
+                        placeholder="Add notes for the customer..."
+                        className="w-full p-2 border rounded-md text-[11px] outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                      />
+                    </div>
+
+                    {/* File Upload */}
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                      onDragLeave={() => setIsDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(false);
+                        const file = e.dataTransfer.files?.[0];
+                        if (file) setResponseFile(file);
+                      }}
+                      className={`p-3 rounded-lg border-2 border-dashed transition ${
+                        isDragOver ? 'border-blue-500 bg-blue-100/50' : 'border-gray-300 bg-gray-50'
+                      }`}
+                    >
+                      <label className="block text-[9px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Upload File</label>
+                      <input
+                        ref={responseFileInputRef}
+                        type="file"
+                        onChange={(e) => setResponseFile(e.target.files?.[0] || null)}
+                        className="block w-full text-[10px] text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                      {responseFile && (
+                        <div className="mt-1.5 flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded text-[10px] text-blue-700 font-medium">
+                          <FileText className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{responseFile.name}</span>
+                          <span className="text-gray-400">({(responseFile.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={handleCreateResponse}
+                      disabled={creatingResponse || !responseFile || !selectedFileCategory}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {creatingResponse ? (
+                        <>Uploading...</>
+                      ) : (
+                        <><Upload className="w-3.5 h-3.5" /> Upload Response</>
+                      )}
+                    </button>
                   </div>
                 )}
 

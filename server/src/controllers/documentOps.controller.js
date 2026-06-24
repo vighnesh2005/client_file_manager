@@ -69,9 +69,7 @@ export const deleteDocument = async (req, res) => {
   if (isResult && doc.resultFile) {
     if (doc.resultFile.storedPath && !doc.resultFileDeletedFromStorage) {
       try {
-        if (fs.existsSync(doc.resultFile.storedPath)) {
-          fs.unlinkSync(doc.resultFile.storedPath);
-        }
+        await storageService.deleteFile(doc.resultFile.storedPath);
       } catch (err) {
         console.error(`Failed to delete file ${doc.resultFile.storedPath}:`, err);
       }
@@ -79,12 +77,9 @@ export const deleteDocument = async (req, res) => {
     }
     doc.isDeleted = true;
   } else {
-    // Delete submission (deletes entire document)
     if (doc.storedPath && !doc.fileDeletedFromStorage) {
       try {
-        if (fs.existsSync(doc.storedPath)) {
-          fs.unlinkSync(doc.storedPath);
-        }
+        await storageService.deleteFile(doc.storedPath);
       } catch (err) {
         console.error(`Failed to delete file ${doc.storedPath}:`, err);
       }
@@ -92,9 +87,7 @@ export const deleteDocument = async (req, res) => {
     }
     if (doc.resultFile?.storedPath && !doc.resultFileDeletedFromStorage) {
       try {
-        if (fs.existsSync(doc.resultFile.storedPath)) {
-          fs.unlinkSync(doc.resultFile.storedPath);
-        }
+        await storageService.deleteFile(doc.resultFile.storedPath);
       } catch (err) {
         console.error(`Failed to delete file ${doc.resultFile.storedPath}:`, err);
       }
@@ -125,9 +118,7 @@ export const deleteGroup = async (req, res) => {
   for (const doc of docs) {
     if (doc.storedPath && !doc.fileDeletedFromStorage) {
       try {
-        if (fs.existsSync(doc.storedPath)) {
-          fs.unlinkSync(doc.storedPath);
-        }
+        await storageService.deleteFile(doc.storedPath);
       } catch (err) {
         console.error(`Failed to delete file ${doc.storedPath}:`, err);
       }
@@ -135,9 +126,7 @@ export const deleteGroup = async (req, res) => {
     }
     if (doc.resultFile?.storedPath && !doc.resultFileDeletedFromStorage) {
       try {
-        if (fs.existsSync(doc.resultFile.storedPath)) {
-          fs.unlinkSync(doc.resultFile.storedPath);
-        }
+        await storageService.deleteFile(doc.resultFile.storedPath);
       } catch (err) {
         console.error(`Failed to delete file ${doc.resultFile.storedPath}:`, err);
       }
@@ -264,9 +253,9 @@ export const uploadFilesToFolder = async (req, res) => {
 
     res.status(201).json({ success: true, data: createdDocs, message: 'Files uploaded successfully' });
   } catch (err) {
-    // Rollback saved files
+    // Rollback saved files (R2 keys)
     for (const fp of savedFilePaths) {
-      if (fs.existsSync(fp)) { try { fs.unlinkSync(fp); } catch (_) {} }
+      try { await storageService.deleteFile(fp); } catch (_) {}
     }
     for (const file of req.files) {
       if (file.path && fs.existsSync(file.path)) { try { fs.unlinkSync(file.path); } catch (_) {} }

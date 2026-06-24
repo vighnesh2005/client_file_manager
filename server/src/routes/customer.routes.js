@@ -5,6 +5,8 @@ import {
   uploadDocument,
   getDocuments,
   downloadDocument,
+  getResponses,
+  getResponseCategories,
 } from '../controllers/customer.controller.js';
 import auth from '../middleware/auth.js';
 import requireRole from '../middleware/role.js';
@@ -20,6 +22,8 @@ router.get('/departments', getDepartments);
 router.post('/upload', uploadRateLimiter, upload.array('files', 10), validateUploadedFiles, uploadDocument);
 router.get('/documents', getDocuments);
 router.get('/documents/:id/download', downloadDocument);
+router.get('/responses', getResponses);
+router.get('/response-categories', getResponseCategories);
 
 export default router;
 

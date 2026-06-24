@@ -7,7 +7,9 @@ import {
   getDocumentDetail,
   updateDocumentStatus,
   getCategories,
-  uploadResult,
+  createResponse,
+  getResponses,
+  getDepartmentFileCategories,
   blockDocument,
   unblockDocument,
   updateNotes,
@@ -40,7 +42,9 @@ router.get('/documents', getDocuments);
 router.get('/categories', getCategories);
 router.get('/documents/:id', getDocumentDetail);
 router.patch('/documents/:id/status', updateDocumentStatus);
-router.post('/documents/:id/upload-result', upload.single('file'), validateUploadedFiles, uploadResult);
+router.get('/file-categories', getDepartmentFileCategories);
+router.post('/responses', upload.single('file'), validateUploadedFiles, createResponse);
+router.get('/responses', getResponses);
 router.patch('/documents/:id/block', blockDocument);
 router.patch('/documents/:id/unblock', unblockDocument);
 router.put('/documents/:id/notes', updateNotes);

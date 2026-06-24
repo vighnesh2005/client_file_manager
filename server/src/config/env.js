@@ -18,6 +18,9 @@ const env = {
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE) || 52428800,
   MAX_STORAGE_LIMIT: parseInt(process.env.MAX_STORAGE_LIMIT) || 209715200,
   NODE_ENV: process.env.NODE_ENV || 'production',
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_BUCKET: process.env.SUPABASE_BUCKET || 'files',
 };
 
 if (!process.env.JWT_SECRET) {

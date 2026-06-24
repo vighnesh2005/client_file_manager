@@ -1,10 +1,10 @@
 import User from '../models/User.model.js';
 import Department from '../models/Department.model.js';
 import Category from '../models/Category.model.js';
+import FileCategory from '../models/FileCategory.model.js';
 import Document from '../models/Document.model.js';
 import AppError from '../utils/AppError.js';
 import crypto from 'crypto';
-import fs from 'fs';
 
 const generatePassword = () => crypto.randomBytes(4).toString('hex');
 
@@ -630,9 +630,7 @@ export const adminPurgeDocumentFiles = async (req, res) => {
     let itemModified = false;
     if (item.storedPath && !item.fileDeletedFromStorage) {
       try {
-        if (fs.existsSync(item.storedPath)) {
-          fs.unlinkSync(item.storedPath);
-        }
+        await storageService.deleteFile(item.storedPath);
         item.fileDeletedFromStorage = true;
         itemModified = true;
         totalFilesDeleted++;
@@ -642,9 +640,7 @@ export const adminPurgeDocumentFiles = async (req, res) => {
     }
     if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
       try {
-        if (fs.existsSync(item.resultFile.storedPath)) {
-          fs.unlinkSync(item.resultFile.storedPath);
-        }
+        await storageService.deleteFile(item.resultFile.storedPath);
         item.resultFileDeletedFromStorage = true;
         itemModified = true;
         totalFilesDeleted++;
@@ -759,10 +755,10 @@ export const adminBatchDocuments = async (req, res) => {
         }
         for (const item of docsToPurge) {
           if (item.storedPath && !item.fileDeletedFromStorage) {
-            try { if (fs.existsSync(item.storedPath)) fs.unlinkSync(item.storedPath); } catch (_) {}
+            try { await storageService.deleteFile(item.storedPath); } catch (_) {}
           }
           if (item.resultFile?.storedPath && !item.resultFileDeletedFromStorage) {
-            try { if (fs.existsSync(item.resultFile.storedPath)) fs.unlinkSync(item.resultFile.storedPath); } catch (_) {}
+            try { await storageService.deleteFile(item.resultFile.storedPath); } catch (_) {}
           }
           await Document.findByIdAndDelete(item._id);
         }
@@ -773,4 +769,58 @@ export const adminBatchDocuments = async (req, res) => {
   }
 
   res.json({ success: true, message: 'Batch operation completed successfully' });
+};
+
+// ─── FileCategory CRUD ────────────────────────────────────────
+
+export const getFileCategories = async (req, res) => {
+  const { deptId } = req.query;
+  const query = {};
+  if (deptId && typeof deptId === 'string') query.departmentId = deptId;
+
+  const fileCategories = await FileCategory.find(query)
+    .populate('departmentId', 'name')
+    .sort({ name: 1 })
+    .lean();
+
+  res.json({ success: true, data: fileCategories });
+};
+
+export const createFileCategory = async (req, res) => {
+  const { name, description, departmentId } = req.body;
+  if (!name || !departmentId) {
+    throw new AppError('Name and department are required', 400);
+  }
+
+  const dept = await Department.findById(departmentId);
+  if (!dept) throw new AppError('Department not found', 404);
+
+  const fileCategory = await FileCategory.create({
+    name, description: description || '',
+    departmentId,
+    createdBy: req.user._id,
+  });
+
+  res.status(201).json({ success: true, data: fileCategory });
+};
+
+export const updateFileCategory = async (req, res) => {
+  const { id } = req.params;
+  const { name, description, isActive, departmentId } = req.body;
+
+  const fileCategory = await FileCategory.findByIdAndUpdate(
+    id,
+    { $set: { name, description, isActive, departmentId } },
+    { new: true, runValidators: true }
+  );
+
+  if (!fileCategory) throw new AppError('File category not found', 404);
+  res.json({ success: true, data: fileCategory });
+};
+
+export const deleteFileCategory = async (req, res) => {
+  const { id } = req.params;
+  const fileCategory = await FileCategory.findByIdAndDelete(id);
+  if (!fileCategory) throw new AppError('File category not found', 404);
+  res.json({ success: true, message: 'File category deleted' });
 };

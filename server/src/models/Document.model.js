@@ -20,6 +20,11 @@ const documentSchema = new mongoose.Schema({
     ref: 'Category',
     required: false,
   },
+  fileCategoryId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'FileCategory',
+    required: false,
+  },
   departmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department',
@@ -56,7 +61,7 @@ const documentSchema = new mongoose.Schema({
   },
   direction: {
     type: String,
-    enum: ['submission', 'result'],
+    enum: ['submission', 'result', 'response'],
     default: 'submission',
   },
   originalName: String,

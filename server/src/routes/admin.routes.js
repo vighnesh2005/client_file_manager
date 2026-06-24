@@ -5,6 +5,7 @@ import {
   getDepartments, createDepartment, updateDepartment, deleteDepartment, updateDepartmentPermissions,
   getDepartmentUsers, getDepartmentUsersByDept, createDepartmentUser, updateDepartmentUser, deleteDepartmentUser, resetDeptUserPassword, setDeptUserPassword,
   getCategories, getCategoriesByDepartment, createCategory, updateCategory, deleteCategory,
+  getFileCategories, createFileCategory, updateFileCategory, deleteFileCategory,
   getAllDocuments, adminBlockDocument, adminUnblockDocument, adminUpdateDocument, adminDeleteDocument,
   adminPurgeDocumentFiles, adminBatchDocuments,
 } from '../controllers/admin.controller.js';
@@ -53,6 +54,11 @@ router.get('/categories/department/:deptId', getCategoriesByDepartment);
 router.post('/categories', createCategory);
 router.put('/categories/:id', updateCategory);
 router.delete('/categories/:id', deleteCategory);
+
+router.get('/file-categories', getFileCategories);
+router.post('/file-categories', createFileCategory);
+router.put('/file-categories/:id', updateFileCategory);
+router.delete('/file-categories/:id', deleteFileCategory);
 
 router.get('/documents', getAllDocuments);
 router.patch('/documents/:id/block', adminBlockDocument);

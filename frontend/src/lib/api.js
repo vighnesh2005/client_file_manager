@@ -7,12 +7,22 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function getToken(key) {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(key) || sessionStorage.getItem(key);
+}
+
+function clearTokens() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('refreshToken');
+  sessionStorage.removeItem('accessToken');
+  sessionStorage.removeItem('refreshToken');
+}
+
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('accessToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = getToken('accessToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -21,8 +31,7 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
+      clearTokens();
       window.location.href = '/login';
     }
     return Promise.reject(err);
@@ -35,6 +44,12 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   changePassword: (data) => api.put('/auth/change-password', data),
   getMe: () => api.get('/auth/me'),
+};
+
+export const notificationAPI = {
+  getAll: () => api.get('/notifications'),
+  getCount: () => api.get('/notifications/count'),
+  dismiss: (id) => api.delete(`/notifications/${id}`),
 };
 
 export const adminAPI = {
@@ -63,6 +78,10 @@ export const adminAPI = {
   createCategory: (data) => api.post('/admin/categories', data),
   updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
+  getFileCategories: (params) => api.get('/admin/file-categories', { params }),
+  createFileCategory: (data) => api.post('/admin/file-categories', data),
+  updateFileCategory: (id, data) => api.put(`/admin/file-categories/${id}`, data),
+  deleteFileCategory: (id) => api.delete(`/admin/file-categories/${id}`),
   getAllDocuments: (params) => api.get('/admin/documents', { params }),
   blockDocument: (id) => api.patch(`/admin/documents/${id}/block`),
   unblockDocument: (id) => api.patch(`/admin/documents/${id}/unblock`),
@@ -87,6 +106,8 @@ export const customerAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   downloadDocument: (id, type) => api.get(`/customer/documents/${id}/download`, { params: { type }, responseType: 'blob' }),
+  getResponses: (params) => api.get('/customer/responses', { params }),
+  getResponseCategories: () => api.get('/customer/response-categories'),
 };
 
 export const departmentAPI = {
@@ -96,11 +117,13 @@ export const departmentAPI = {
   renameCustomer: (customerId, data) => api.patch(`/department/customers/${customerId}/rename`, data),
   getDocuments: (params) => api.get('/department/documents', { params }),
   getCategories: () => api.get('/department/categories'),
+  getFileCategories: () => api.get('/department/file-categories'),
   getDocumentDetail: (id) => api.get(`/department/documents/${id}`),
   updateStatus: (id, data) => api.patch(`/department/documents/${id}/status`, data),
-  uploadResult: (id, formData) => api.post(`/department/documents/${id}/upload-result`, formData, {
+  createResponse: (formData) => api.post('/department/responses', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  getResponses: (params) => api.get('/department/responses', { params }),
   blockDocument: (id) => api.patch(`/department/documents/${id}/block`),
   unblockDocument: (id) => api.patch(`/department/documents/${id}/unblock`),
   updateNotes: (id, data) => api.put(`/department/documents/${id}/notes`, data),
