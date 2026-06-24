@@ -69,7 +69,6 @@ export default function CustomerDocumentsPage() {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-600">{doc.categoryId?.name || '-'}</td>
                 <td className="px-4 py-3 text-gray-600">{doc.departmentId?.name}</td>
                 <td className="px-4 py-3 text-center">
                   <StatusBadge status={doc.paymentBlocked ? 'blocked' : doc.status} />

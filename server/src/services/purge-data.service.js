@@ -4,7 +4,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import User from '../models/User.model.js';
 import Department from '../models/Department.model.js';
-import Category from '../models/Category.model.js';
 import FileCategory from '../models/FileCategory.model.js';
 import Document from '../models/Document.model.js';
 import Notification from '../models/Notification.model.js';
@@ -37,9 +36,6 @@ const purge = async () => {
 
     const delDepts = await Department.deleteMany({});
     console.log(`Deleted ${delDepts.deletedCount} departments`);
-
-    const delCats = await Category.deleteMany({});
-    console.log(`Deleted ${delCats.deletedCount} categories`);
 
     const delFCs = await FileCategory.deleteMany({});
     console.log(`Deleted ${delFCs.deletedCount} file categories`);

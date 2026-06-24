@@ -73,11 +73,6 @@ export const adminAPI = {
   deleteDepartmentUser: (id) => api.delete(`/admin/department-users/${id}`),
   resetDeptUserPassword: (id) => api.put(`/admin/department-users/${id}/reset-password`),
   setDeptUserPassword: (id, data) => api.put(`/admin/department-users/${id}/set-password`, data),
-  getCategories: (params) => api.get('/admin/categories', { params }),
-  getCategoriesByDept: (deptId) => api.get(`/admin/categories/department/${deptId}`),
-  createCategory: (data) => api.post('/admin/categories', data),
-  updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
-  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
   getFileCategories: (params) => api.get('/admin/file-categories', { params }),
   createFileCategory: (data) => api.post('/admin/file-categories', data),
   updateFileCategory: (id, data) => api.put(`/admin/file-categories/${id}`, data),
@@ -99,7 +94,6 @@ export const adminAPI = {
 };
 
 export const customerAPI = {
-  getCategories: () => api.get('/customer/categories'),
   getDepartments: () => api.get('/customer/departments'),
   getDocuments: (params) => api.get('/customer/documents', { params }),
   uploadDocument: (formData) => api.post('/customer/upload', formData, {
@@ -116,7 +110,6 @@ export const departmentAPI = {
   getCustomerDocuments: (customerId, params) => api.get(`/department/customers/${customerId}/documents`, { params }),
   renameCustomer: (customerId, data) => api.patch(`/department/customers/${customerId}/rename`, data),
   getDocuments: (params) => api.get('/department/documents', { params }),
-  getCategories: () => api.get('/department/categories'),
   getFileCategories: () => api.get('/department/file-categories'),
   getDocumentDetail: (id) => api.get(`/department/documents/${id}`),
   updateStatus: (id, data) => api.patch(`/department/documents/${id}/status`, data),

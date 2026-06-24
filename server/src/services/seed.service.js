@@ -45,7 +45,7 @@ const seed = async () => {
     console.log('\nAdmin created successfully:');
     console.log('  Email:    ' + adminEmail);
     console.log('  Password: (set in .env ADMIN_PASSWORD)');
-    console.log('\nYou can now log in and create departments, users, and categories from the dashboard.');
+    console.log('\nYou can now log in and create departments, users, and file categories from the dashboard.');
 
     await mongoose.disconnect();
   } catch (error) {

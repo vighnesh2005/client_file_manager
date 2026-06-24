@@ -6,7 +6,6 @@ import {
   getDocuments,
   getDocumentDetail,
   updateDocumentStatus,
-  getCategories,
   createResponse,
   getResponses,
   getDepartmentFileCategories,
@@ -39,7 +38,6 @@ router.get('/customers', getCustomers);
 router.get('/customers/:customerId/documents', getCustomerDocuments);
 router.patch('/customers/:customerId/rename', renameCustomer);
 router.get('/documents', getDocuments);
-router.get('/categories', getCategories);
 router.get('/documents/:id', getDocumentDetail);
 router.patch('/documents/:id/status', updateDocumentStatus);
 router.get('/file-categories', getDepartmentFileCategories);

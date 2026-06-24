@@ -100,7 +100,7 @@ export default function AdminDashboard() {
                 <div key={doc._id} className="flex items-center justify-between p-2 border rounded-lg">
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{doc.title || doc.originalName}</p>
-                    <p className="text-xs text-gray-500">{doc.customerId?.name} • {doc.categoryId?.name}</p>
+                    <p className="text-xs text-gray-500">{doc.customerId?.name}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {!['completed', 'blocked'].includes(sla) && <SlaBadge slaStatus={sla} />}

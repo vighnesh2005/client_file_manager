@@ -64,7 +64,6 @@ export default function DeptDashboard() {
                     <p className="text-sm font-medium truncate">{doc.title || doc.originalName}</p>
                     <p className="text-xs text-gray-500">
                       {doc.customerId?.name}
-                      {doc.categoryId?.name ? ` • ${doc.categoryId.name}` : ''}
                       {doc.description ? ` • "${doc.description.substring(0, 50)}${doc.description.length > 50 ? '...' : ''}"` : ''}
                       {" • "}{formatDateTime(doc.createdAt)}
                     </p>

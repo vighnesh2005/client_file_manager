@@ -4,7 +4,6 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../src/models/User.model.js';
 import Department from '../src/models/Department.model.js';
-import Category from '../src/models/Category.model.js';
 import FileCategory from '../src/models/FileCategory.model.js';
 import Notification from '../src/models/Notification.model.js';
 import Document from '../src/models/Document.model.js';
@@ -36,7 +35,6 @@ export {
   app,
   User,
   Department,
-  Category,
   FileCategory,
   Notification,
   Document,
@@ -103,13 +101,4 @@ export async function createFileCategory(deptId, overrides = {}) {
   return fc;
 }
 
-export async function createCategory(deptId, overrides = {}) {
-  const cat = await Category.create({
-    name: 'GST Filing',
-    description: 'GST related documents',
-    departmentId: deptId,
-    isActive: true,
-    ...overrides,
-  });
-  return cat;
-}
+

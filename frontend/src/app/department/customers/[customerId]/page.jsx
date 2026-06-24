@@ -49,7 +49,6 @@ export default function DeptCustomerDocsExplorer() {
   const selectFileId = searchParams.get('selectFile');
 
   const [docs, setDocs] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -209,13 +208,9 @@ export default function DeptCustomerDocsExplorer() {
   const loadData = () => {
     if (!customerId) return;
     setLoading(true);
-    Promise.all([
-      departmentAPI.getCustomerDocuments(customerId),
-      departmentAPI.getCategories()
-    ])
-      .then(([docsRes, catRes]) => {
+    departmentAPI.getCustomerDocuments(customerId)
+      .then((docsRes) => {
         setDocs(docsRes.data.data);
-        setCategories(catRes.data.data);
         
         // If an item is currently selected, refresh its data reference
         if (selectedItem) {

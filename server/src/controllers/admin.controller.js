@@ -1,6 +1,5 @@
 import User from '../models/User.model.js';
 import Department from '../models/Department.model.js';
-import Category from '../models/Category.model.js';
 import FileCategory from '../models/FileCategory.model.js';
 import Document from '../models/Document.model.js';
 import AppError from '../utils/AppError.js';
@@ -59,7 +58,6 @@ export const getDashboard = async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(10)
     .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
     .lean();
 
   res.json({
@@ -187,7 +185,6 @@ export const getCustomerDocuments = async (req, res) => {
     const skip = (page - 1) * limit;
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -200,7 +197,6 @@ export const getCustomerDocuments = async (req, res) => {
     });
   } else {
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .sort({ createdAt: -1 })
       .lean();
@@ -243,7 +239,6 @@ export const deleteDepartment = async (req, res) => {
   const { id } = req.params;
   const dept = await Department.findByIdAndDelete(id);
   if (!dept) throw new AppError('Department not found', 404);
-  await Category.updateMany({ departmentId: id }, { isActive: false });
   await User.updateMany({ departmentId: id, role: 'department' }, { isActive: false });
   res.json({ success: true, message: 'Department deleted' });
 };
@@ -362,73 +357,11 @@ export const setDeptUserPassword = async (req, res) => {
   res.json({ success: true, message: 'Password updated successfully' });
 };
 
-export const getCategories = async (req, res) => {
-  const { deptId } = req.query;
-  const query = {};
-  if (deptId && typeof deptId === 'string') query.departmentId = deptId;
-
-  const categories = await Category.find(query)
-    .populate('departmentId', 'name')
-    .sort({ name: 1 })
-    .lean();
-
-  res.json({ success: true, data: categories });
-};
-
-export const getCategoriesByDepartment = async (req, res) => {
-  const { deptId } = req.params;
-  const categories = await Category.find({ departmentId: deptId })
-    .sort({ name: 1 })
-    .lean();
-
-  res.json({ success: true, data: categories });
-};
-
-export const createCategory = async (req, res) => {
-  const { name, description, departmentId } = req.body;
-  if (!name || !departmentId) {
-    throw new AppError('Name and department are required', 400);
-  }
-
-  const dept = await Department.findById(departmentId);
-  if (!dept) throw new AppError('Department not found', 404);
-
-  const category = await Category.create({
-    name, description: description || '',
-    departmentId,
-    createdBy: req.user._id,
-  });
-
-  res.status(201).json({ success: true, data: category });
-};
-
-export const updateCategory = async (req, res) => {
-  const { id } = req.params;
-  const { name, description, isActive, departmentId } = req.body;
-
-  const category = await Category.findByIdAndUpdate(
-    id,
-    { $set: { name, description, isActive, departmentId } },
-    { new: true, runValidators: true }
-  );
-
-  if (!category) throw new AppError('Category not found', 404);
-  res.json({ success: true, data: category });
-};
-
-export const deleteCategory = async (req, res) => {
-  const { id } = req.params;
-  const category = await Category.findByIdAndDelete(id);
-  if (!category) throw new AppError('Category not found', 404);
-  res.json({ success: true, message: 'Category deleted' });
-};
-
 export const getAllDocuments = async (req, res) => {
-  const { departmentId, categoryId, status, customerId, search } = req.query;
+  const { departmentId, status, customerId, search } = req.query;
   const query = { isDeleted: { $ne: true } };
 
   if (departmentId && typeof departmentId === 'string') query.departmentId = departmentId;
-  if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
   if (status && typeof status === 'string') query.status = status;
   if (customerId && typeof customerId === 'string') query.customerId = customerId;
 
@@ -458,7 +391,6 @@ export const getAllDocuments = async (req, res) => {
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
@@ -473,7 +405,6 @@ export const getAllDocuments = async (req, res) => {
   } else {
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })

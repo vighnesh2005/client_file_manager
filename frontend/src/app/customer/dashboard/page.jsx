@@ -65,7 +65,6 @@ export default function CustomerDashboard() {
                   <p className="text-sm font-medium truncate">{doc.title || doc.originalName}</p>
                   <p className="text-xs text-gray-500">
                     {doc.departmentId?.name || 'No Department'}
-                    {doc.categoryId?.name ? ` • ${doc.categoryId.name}` : ''}
                     {" • "}{formatDateTime(doc.createdAt)}
                   </p>
                 </div>

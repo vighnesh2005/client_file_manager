@@ -4,7 +4,7 @@ import {
   getCustomers, createCustomer, updateCustomer, deleteCustomer, resetCustomerPassword, setCustomerPassword, getCustomerDocuments,
   getDepartments, createDepartment, updateDepartment, deleteDepartment, updateDepartmentPermissions,
   getDepartmentUsers, getDepartmentUsersByDept, createDepartmentUser, updateDepartmentUser, deleteDepartmentUser, resetDeptUserPassword, setDeptUserPassword,
-  getCategories, getCategoriesByDepartment, createCategory, updateCategory, deleteCategory,
+
   getFileCategories, createFileCategory, updateFileCategory, deleteFileCategory,
   getAllDocuments, adminBlockDocument, adminUnblockDocument, adminUpdateDocument, adminDeleteDocument,
   adminPurgeDocumentFiles, adminBatchDocuments,
@@ -48,12 +48,6 @@ router.put('/department-users/:id', updateDepartmentUser);
 router.delete('/department-users/:id', deleteDepartmentUser);
 router.put('/department-users/:id/reset-password', resetDeptUserPassword);
 router.put('/department-users/:id/set-password', setDeptUserPassword);
-
-router.get('/categories', getCategories);
-router.get('/categories/department/:deptId', getCategoriesByDepartment);
-router.post('/categories', createCategory);
-router.put('/categories/:id', updateCategory);
-router.delete('/categories/:id', deleteCategory);
 
 router.get('/file-categories', getFileCategories);
 router.post('/file-categories', createFileCategory);

@@ -8,7 +8,7 @@ import Link from 'next/link';
 import TourOverlay from '@/components/ui/TourOverlay';
 import { motion } from 'framer-motion';
 import {
-  AlertCircle, LayoutDashboard, Users, Building2, UserCog, FolderTree, FileText, LogOut, ChevronLeft, Menu, X,
+  AlertCircle, LayoutDashboard, Users, Building2, UserCog, FileText, LogOut, ChevronLeft, Menu, X,
 } from 'lucide-react';
 
 const navItems = [
@@ -16,7 +16,6 @@ const navItems = [
   { href: '/admin/customers', label: 'Customers', icon: Users },
   { href: '/admin/departments', label: 'Departments', icon: Building2 },
   { href: '/admin/department-users', label: 'Dept Users', icon: UserCog },
-  { href: '/admin/categories', label: 'Service Categories', icon: FolderTree },
   { href: '/admin/file-categories', label: 'File Categories', icon: FileText },
   { href: '/admin/documents', label: 'Documents', icon: FileText },
 ];

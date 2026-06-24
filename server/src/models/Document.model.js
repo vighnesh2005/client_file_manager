@@ -15,11 +15,6 @@ const documentSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  categoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-    required: false,
-  },
   fileCategoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'FileCategory',

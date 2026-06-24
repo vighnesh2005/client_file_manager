@@ -1,7 +1,6 @@
 import Document from '../models/Document.model.js';
 import User from '../models/User.model.js';
 import Department from '../models/Department.model.js';
-import Category from '../models/Category.model.js';
 import FileCategory from '../models/FileCategory.model.js';
 import Notification from '../models/Notification.model.js';
 import AppError from '../utils/AppError.js';
@@ -25,7 +24,7 @@ export const getDashboard = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10)
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
+      
       .lean(),
     Document.countDocuments({
       ...subFilter,
@@ -176,7 +175,7 @@ export const getCustomerDocuments = async (req, res) => {
     const skip = (page - 1) * limit;
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
+      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -189,7 +188,7 @@ export const getCustomerDocuments = async (req, res) => {
     });
   } else {
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
+      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .lean();
@@ -199,11 +198,10 @@ export const getCustomerDocuments = async (req, res) => {
 
 export const getDocuments = async (req, res) => {
   const deptId = req.user.departmentId;
-  const { status, categoryId, customerId } = req.query;
+  const { status, customerId } = req.query;
   const query = { departmentId: deptId, direction: 'submission', isDeleted: { $ne: true } };
 
   if (status && typeof status === 'string') query.status = status;
-  if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
   if (customerId && typeof customerId === 'string') query.customerId = customerId;
 
   const page = parseInt(req.query.page);
@@ -214,7 +212,7 @@ export const getDocuments = async (req, res) => {
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
+      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -228,7 +226,7 @@ export const getDocuments = async (req, res) => {
   } else {
     const docs = await Document.find(query)
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
+      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: -1 })
       .lean();
@@ -242,7 +240,7 @@ export const getDocumentDetail = async (req, res) => {
 
   const doc = await Document.findOne({ _id: id, departmentId: deptId })
     .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
+    
     .populate('resultFile.uploadedBy', 'name');
 
   if (!doc) throw new AppError('Document not found', 404);
@@ -252,7 +250,7 @@ export const getDocumentDetail = async (req, res) => {
   if (doc.groupId) {
     groupDocs = await Document.find({ groupId: doc.groupId })
       .populate('customerId', 'name email')
-      .populate('categoryId', 'name')
+      
       .populate('resultFile.uploadedBy', 'name')
       .sort({ createdAt: 1 })
       .lean();
@@ -296,14 +294,6 @@ export const updateDocumentStatus = async (req, res) => {
   await doc.save();
 
   res.json({ success: true, data: doc });
-};
-
-export const getCategories = async (req, res) => {
-  const deptId = req.user.departmentId;
-  const categories = await Category.find({ departmentId: deptId, isActive: true })
-    .sort({ name: 1 })
-    .lean();
-  res.json({ success: true, data: categories });
 };
 
 export const createResponse = async (req, res) => {

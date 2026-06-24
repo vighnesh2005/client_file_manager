@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import fs from 'fs';
 import env from '../config/env.js';
-import Category from '../models/Category.model.js';
 import Document from '../models/Document.model.js';
 import Department from '../models/Department.model.js';
 import User from '../models/User.model.js';
@@ -9,48 +8,6 @@ import Notification from '../models/Notification.model.js';
 import AppError from '../utils/AppError.js';
 import storageService from '../services/storage.service.js';
 import path from 'path';
-
-export const getCategories = async (req, res) => {
-  const customerId = req.user._id;
-
-  const categories = await Category.find({ isActive: true })
-    .populate('departmentId', 'name')
-    .sort({ name: 1 })
-    .lean();
-
-  // Fetch documents belonging to this customer that have been assigned a category
-  const customerDocs = await Document.find({
-    customerId,
-    categoryId: { $ne: null },
-    isDeleted: { $ne: true },
-  })
-    .populate('categoryId', 'name')
-    .populate('departmentId', 'name')
-    .sort({ createdAt: -1 })
-    .lean();
-
-  // Group documents by categoryId for quick lookup
-  const docsByCategory = {};
-  for (const doc of customerDocs) {
-    const catId = doc.categoryId?._id?.toString();
-    if (!catId) continue;
-    if (!docsByCategory[catId]) docsByCategory[catId] = [];
-    docsByCategory[catId].push(doc);
-  }
-
-  const grouped = {};
-  for (const cat of categories) {
-    const deptName = cat.departmentId?.name || 'General';
-    if (!grouped[deptName]) grouped[deptName] = [];
-    const catIdStr = cat._id.toString();
-    grouped[deptName].push({
-      ...cat,
-      documents: docsByCategory[catIdStr] || [],
-    });
-  }
-
-  res.json({ success: true, data: grouped });
-};
 
 export const getDepartments = async (req, res) => {
   const departments = await Department.find({ isActive: true })
@@ -178,9 +135,7 @@ export const uploadDocument = async (req, res) => {
 
 export const getDocuments = async (req, res) => {
   const customerId = req.user._id;
-  const { categoryId } = req.query;
   const query = { customerId, isDeleted: { $ne: true } };
-  if (categoryId && typeof categoryId === 'string') query.categoryId = categoryId;
 
   const page = parseInt(req.query.page);
   const limit = parseInt(req.query.limit);
@@ -189,7 +144,6 @@ export const getDocuments = async (req, res) => {
     const skip = (page - 1) * limit;
     const total = await Document.countDocuments(query);
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -202,7 +156,6 @@ export const getDocuments = async (req, res) => {
     });
   } else {
     const docs = await Document.find(query)
-      .populate('categoryId', 'name')
       .populate('departmentId', 'name')
       .sort({ createdAt: -1 })
       .lean();

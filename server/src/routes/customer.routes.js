@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-  getCategories,
   getDepartments,
   uploadDocument,
   getDocuments,
@@ -17,7 +16,6 @@ const router = Router();
 
 router.use(auth, requireRole('customer'));
 
-router.get('/categories', getCategories);
 router.get('/departments', getDepartments);
 router.post('/upload', uploadRateLimiter, upload.array('files', 10), validateUploadedFiles, uploadDocument);
 router.get('/documents', getDocuments);

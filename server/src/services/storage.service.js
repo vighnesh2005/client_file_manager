@@ -17,11 +17,11 @@ class StorageService {
     return base.replace(/[/\\:*?"<>|]/g, '_');
   }
 
-  async saveSubmission(file, customerId, categoryId) {
+  async saveSubmission(file, customerId, departmentId) {
     const folder = await this.getCustomerFolderName(customerId);
     const safeName = this.sanitizeFilename(file.originalname);
     const fileName = `${Date.now()}_${safeName}`;
-    const key = `customers/${folder}/${categoryId}/submissions/${fileName}`;
+    const key = `customers/${folder}/${departmentId}/submissions/${fileName}`;
 
     const buffer = fs.readFileSync(file.path);
     await supabase.upload(key, buffer, file.mimetype);
@@ -33,11 +33,11 @@ class StorageService {
     return { storedPath: key, originalName: file.originalname, mimeType: file.mimetype, fileSize: file.size };
   }
 
-  async saveResult(file, customerId, categoryId) {
+  async saveResult(file, customerId, departmentId) {
     const folder = await this.getCustomerFolderName(customerId);
     const safeName = this.sanitizeFilename(file.originalname);
     const fileName = `${Date.now()}_${safeName}`;
-    const key = `customers/${folder}/${categoryId}/results/${fileName}`;
+    const key = `customers/${folder}/${departmentId}/results/${fileName}`;
 
     const buffer = fs.readFileSync(file.path);
     await supabase.upload(key, buffer, file.mimetype);

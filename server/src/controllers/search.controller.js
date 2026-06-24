@@ -33,7 +33,6 @@ export const globalSearch = async (req, res) => {
       ]
     })
     .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
     .populate('departmentId', 'name')
     .limit(20)
     .lean();
@@ -63,7 +62,6 @@ export const globalSearch = async (req, res) => {
       ]
     })
     .populate('customerId', 'name email')
-    .populate('categoryId', 'name')
     .populate('departmentId', 'name')
     .limit(20)
     .lean();
@@ -78,7 +76,6 @@ export const globalSearch = async (req, res) => {
         { customGroupName: searchRegex }
       ]
     })
-    .populate('categoryId', 'name')
     .populate('departmentId', 'name')
     .limit(20)
     .lean();
