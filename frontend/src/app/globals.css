@@ -6,17 +6,43 @@
 }
 
 @theme {
-  --color-blue-50: #f4f7fb;
-  --color-blue-100: #e8eff6;
-  --color-blue-200: #d1dfed;
-  --color-blue-300: #a9c2dc;
-  --color-blue-400: #749cc4;
-  --color-blue-500: #4a7aa8;
-  --color-blue-600: #1e3a60; /* Brand Navy Primary */
-  --color-blue-700: #162c4b; /* Brand Navy Dark / Hover */
-  --color-blue-800: #0e1c31; /* Deep Midnight Navy */
-  --color-blue-900: #08111f; /* Near Black Navy */
-  --color-blue-950: #040911; /* Ultra Dark Navy sidebar */
+  /* Remap default blue scale to a premium Teal palette */
+  --color-blue-50: #f0fdfa;
+  --color-blue-100: #ccfbf1;
+  --color-blue-200: #99f6e4;
+  --color-blue-300: #5eead4;
+  --color-blue-400: #2dd4bf;
+  --color-blue-500: #14b8a6;
+  --color-blue-600: #0d9488; /* Main Active Teal */
+  --color-blue-700: #0f766e; /* Hover Teal */
+  --color-blue-800: #115e59;
+  --color-blue-900: #134e4a;
+  --color-blue-950: #0f2d2a;
+
+  /* Remap default amber to custom premium metallic Gold colors */
+  --color-amber-50: #fdfbf7;
+  --color-amber-100: #faf3e2;
+  --color-amber-200: #f3e4c0;
+  --color-amber-300: #ebd092;
+  --color-amber-400: #e0b457;
+  --color-amber-500: #d4af37; /* Primary Gold Accent */
+  --color-amber-600: #c5a059; /* Hover Gold */
+  --color-amber-700: #9c7b41;
+  --color-amber-800: #7a5e30;
+  --color-amber-900: #523e1f;
+
+  /* Add custom navy scale for main layouts, cards, and sidebars */
+  --color-navy-50: #f6f8fa;
+  --color-navy-100: #ebf0f5;
+  --color-navy-200: #ccdbeb;
+  --color-navy-300: #9dbddc;
+  --color-navy-400: #659acc;
+  --color-navy-500: #3f7fb3;
+  --color-navy-600: #2c6394;
+  --color-navy-700: #245078;
+  --color-navy-800: #17334d;
+  --color-navy-900: #0f2233;
+  --color-navy-950: #08121b; /* Main Dark Navy */
 
   --font-sans: var(--font-geist-sans), Inter, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
@@ -27,4 +53,16 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+/* Premium dual-glow grid effect for login background */
+.bg-grid-glow {
+  background-color: #08121b;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(13, 148, 136, 0.12) 0%, transparent 50%),
+    linear-gradient(to right, rgba(20, 184, 166, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 184, 166, 0.04) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+}
+
 
