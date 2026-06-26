@@ -264,7 +264,7 @@ export default function DeptCustomersExplorer() {
                     selectedItem?.id === c._id ? 'bg-blue-100/70 text-blue-800 font-semibold shadow-xs' : 'hover:bg-slate-100'
                   }`}
                 >
-                  <Folder className="w-3.5 h-3.5 text-[#52a6ec] fill-[#52a6ec] shrink-0" />
+                  <Folder className="w-3.5 h-3.5 text-blue-700 fill-blue-700 shrink-0" />
                   <span className="truncate" title={c.name}>{c.name}</span>
                 </button>
               ))}
@@ -280,7 +280,7 @@ export default function DeptCustomersExplorer() {
             </div>
           ) : sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-20 text-slate-400 gap-2">
-              <Folder className="w-12 h-12 text-[#52a6ec] fill-[#52a6ec]" />
+              <Folder className="w-12 h-12 text-blue-700 fill-blue-700" />
               <span className="text-xs font-semibold">No customers found</span>
             </div>
           ) : viewMode === 'grid' ? (
@@ -297,7 +297,7 @@ export default function DeptCustomersExplorer() {
                     }`}
                   >
                     <div className="relative">
-                      <Folder className="w-12 h-12 text-[#52a6ec] fill-[#52a6ec]" />
+                      <Folder className="w-12 h-12 text-blue-700 fill-blue-700" />
                       <span className="absolute bottom-2 right-1.5 bg-white text-[8px] font-extrabold text-slate-500 px-0.5 border border-slate-200 rounded shadow-xs">
                         {c.totalDocs}
                       </span>
@@ -334,7 +334,7 @@ export default function DeptCustomersExplorer() {
                       className={`cursor-pointer ${selectedItem?.id === c._id ? 'bg-blue-50 font-semibold' : 'hover:bg-blue-50/50'}`}
                     >
                       <td className="py-2 px-3 flex items-center gap-2 max-w-sm">
-                        <Folder className="w-3.5 h-3.5 text-[#52a6ec] fill-[#52a6ec] shrink-0" />
+                        <Folder className="w-3.5 h-3.5 text-blue-700 fill-blue-700 shrink-0" />
                         <span className="truncate">{c.name}</span>
                       </td>
                       <td className="py-2 px-3 text-gray-500">{c.totalDocs || 0}</td>
@@ -384,7 +384,7 @@ export default function DeptCustomersExplorer() {
               </div>
 
               <div className="p-6 bg-white border border-slate-200/80 rounded-lg flex items-center justify-center shadow-xs">
-                <Folder className="w-14 h-14 text-[#52a6ec] fill-[#52a6ec]" />
+                <Folder className="w-14 h-14 text-blue-700 fill-blue-700" />
               </div>
 
               <div className="space-y-2">

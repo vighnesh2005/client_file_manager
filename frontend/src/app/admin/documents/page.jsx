@@ -800,7 +800,7 @@ export default function AdminDocumentsExplorer() {
                       onClick={() => handleSidebarCustomerClick(c)}
                       className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-left transition ${isActive ? 'bg-blue-100/70 text-blue-800 font-semibold shadow-xs' : 'hover:bg-slate-100'}`}
                     >
-                      <Folder className="w-3.5 h-3.5 text-blue-500 fill-blue-100/60" />
+                      <Folder className="w-3.5 h-3.5 text-blue-700 fill-blue-700" />
                       <span className="truncate" title={c.name}>{c.name}</span>
                     </button>
                   );
@@ -953,7 +953,7 @@ export default function AdminDocumentsExplorer() {
                 <div className="flex-1 overflow-y-auto min-h-0">
                   {explorerItems.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center py-20 text-slate-400 gap-2">
-                      <Folder className="w-12 h-12 text-blue-300 fill-blue-100/40" />
+                      <Folder className="w-12 h-12 text-blue-700 fill-blue-700" />
                       <p className="text-sm font-medium">No items</p>
                       <p className="text-xs mt-1">Navigate to a request folder and upload files, or create a new folder</p>
                     </div>
@@ -996,13 +996,7 @@ export default function AdminDocumentsExplorer() {
                               <div className="relative">
                                 <Folder
                                   title={`${item.name} — ${item.type} (${item.itemCount} items)`}
-                                  className={`w-12 h-12 ${
-                                    item.type === 'customer'
-                                      ? 'text-blue-500 fill-blue-100/60'
-                                      : item.type === 'dept'
-                                      ? 'text-blue-500 fill-blue-100/60'
-                                      : 'text-blue-500 fill-blue-100/60'
-                                  }`}
+                                  className="w-12 h-12 text-blue-700 fill-blue-700"
                                 />
                                 <span className="absolute bottom-2 right-1.5 bg-white text-[8px] font-extrabold text-gray-500 px-0.5 border border-[#d1d5db] rounded shadow-xs">
                                   {item.itemCount}
@@ -1078,13 +1072,7 @@ export default function AdminDocumentsExplorer() {
                                 <td className="py-2 px-3 flex items-center gap-2 max-w-sm">
                                   {isFolder ? (
                                     <Folder
-                                      className={`w-3.5 h-3.5 shrink-0 ${
-                                        item.type === 'customer'
-                                          ? 'text-blue-500 fill-blue-100/60'
-                                          : item.type === 'dept'
-                                          ? 'text-blue-500 fill-blue-100/60'
-                                          : 'text-blue-500 fill-blue-100/60'
-                                      }`}
+                                      className="w-3.5 h-3.5 shrink-0 text-blue-700 fill-blue-700"
                                     />
                                   ) : item.type === 'result_file' ? (
                                     <CheckCircle className="w-3.5 h-3.5 text-green-600 shrink-0" />
@@ -1174,7 +1162,7 @@ export default function AdminDocumentsExplorer() {
                     <CheckCircle className="w-12 h-12 text-green-500" />
                   ) : (
                     <Folder
-                      className={`w-12 h-12 text-blue-500 fill-blue-100/60`}
+                      className="w-12 h-12 text-blue-700 fill-blue-700"
                     />
                   )}
                 </div>

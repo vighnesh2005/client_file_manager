@@ -75,7 +75,8 @@ export default function CustomerResponseCategoriesPage() {
 
         <div className="bg-white rounded-lg shadow">
           <div className="flex items-center gap-2 px-5 py-4 border-b bg-blue-50 text-blue-900 rounded-t-lg">
-            <Folder className="w-5 h-5 text-blue-500" />
+            <Folder className="w-5 h-5 text-blue-700 fill-blue-700" />
+
             <div>
               <h1 className="text-lg font-bold text-gray-800">{selectedCat.name}</h1>
               <p className="text-xs text-gray-500">{selectedCat.departmentName}</p>
