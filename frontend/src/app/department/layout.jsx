@@ -12,7 +12,7 @@ import Link from 'next/link';
 import TourOverlay from '@/components/ui/TourOverlay';
 import { motion } from 'framer-motion';
 import {
-  AlertCircle, LayoutDashboard, Users, FileSearch, ChevronLeft, Menu, LogOut, X,
+  LayoutDashboard, Users, FileSearch, ChevronLeft, Menu, LogOut, X,
 } from 'lucide-react';
 
 const navItems = [
@@ -140,12 +140,6 @@ export default function DepartmentLayout({ children }) {
               </div>
             </div>
           </div>
-          <a href="mailto:support@cafirm.com?subject=Report a Problem" className="flex items-center text-sm text-blue-300/60 hover:text-blue-100 w-full px-2 py-1.5 rounded hover:bg-blue-900/30 mt-1 overflow-hidden">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
-              Report a Problem
-            </span>
-          </a>
           <button onClick={logout} className="flex items-center text-sm text-blue-300 hover:text-white w-full px-2 py-1.5 rounded hover:bg-blue-900/40 overflow-hidden">
             <LogOut className="w-4 h-4 shrink-0" />
             <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>

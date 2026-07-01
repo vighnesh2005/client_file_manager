@@ -11,7 +11,7 @@ import Link from 'next/link';
 import TourOverlay from '@/components/ui/TourOverlay';
 import { motion } from 'framer-motion';
 import {
-  AlertCircle, LayoutDashboard, Users, Building2, UserCog, FileText, LogOut, ChevronLeft, Menu, X, KeyRound,
+  LayoutDashboard, Users, Building2, UserCog, FileText, LogOut, ChevronLeft, Menu, X, KeyRound,
 } from 'lucide-react';
 
 const navItems = [
@@ -152,12 +152,6 @@ export default function AdminLayout({ children }) {
               Change Password
             </span>
           </Link>
-          <a href="mailto:support@cafirm.com?subject=Report a Problem" className="flex items-center text-sm text-navy-300/60 hover:text-blue-100 w-full px-2 py-1.5 rounded hover:bg-navy-800/30 mt-1 overflow-hidden">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
-              Report a Problem
-            </span>
-          </a>
           <button onClick={logout} className="flex items-center text-sm text-navy-300 hover:text-white w-full px-2 py-1.5 rounded hover:bg-navy-800/40 overflow-hidden">
             <LogOut className="w-4 h-4 shrink-0" />
             <span className={`transition-all duration-300 whitespace-nowrap overflow-hidden ${sidebarOpen ? 'opacity-100 max-w-64 ml-3' : 'opacity-0 max-w-0 ml-0 pointer-events-none'}`}>
